@@ -1,0 +1,6 @@
+[project]
+name = "agora-ai-service"
+version = "0.1.0"
+description = "Coletores e workers de NLP para o Ágora"
+requires-python = ">=3.11"
+dependencies = ["requests"]

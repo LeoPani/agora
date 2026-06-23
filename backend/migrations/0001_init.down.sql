@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS collector_runs;
+DROP TABLE IF EXISTS signals;
+DROP TABLE IF EXISTS partners;
+DROP TABLE IF EXISTS opportunities;
+DROP TABLE IF EXISTS patent_citations;
+DROP TABLE IF EXISTS patent_inventors;
+DROP TABLE IF EXISTS patents;
+DROP TABLE IF EXISTS publication_authors;
+DROP TABLE IF EXISTS publications;
+DROP TABLE IF EXISTS researchers;
+DROP EXTENSION IF EXISTS vector;
