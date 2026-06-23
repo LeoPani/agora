@@ -1,179 +1,167 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  BookOpen,
-  Users,
-  Clock,
-  CalendarClock,
-  Radio,
-  Zap,
+  BookOpen, FlaskConical, Users, FileText,
+  BarChart3, TrendingUp, Database, Activity,
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081";
 
-export default function VisaoGeralPage() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+function KpiCard({ icon: Icon, label, value, sub, color }) {
+  return (
+    <div
+      className="rounded-xl p-5 flex flex-col gap-3"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+          {label}
+        </span>
+        <div className="p-2 rounded-lg" style={{ background: "var(--surface-2)" }}>
+          <Icon size={16} style={{ color: color || "var(--accent-hover)" }} />
+        </div>
+      </div>
+      <div>
+        <p className="text-3xl font-bold text-white">{value ?? "—"}</p>
+        {sub && <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function RunRow({ run }) {
+  const variant = run.status === "ok" ? "success" : run.status === "running" ? "gold" : "error";
+  const date = run.started_at ? new Date(run.started_at).toLocaleString("pt-BR") : "—";
+  return (
+    <div className="flex items-center gap-3 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+      <Badge variant={variant}>{run.status}</Badge>
+      <span className="flex-1 text-sm text-white truncate">{run.collector_name}</span>
+      <span className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+        {(run.records_collected ?? 0).toLocaleString("pt-BR")} reg
+      </span>
+      <span className="text-xs" style={{ color: "var(--text-muted)", minWidth: "10rem", textAlign: "right" }}>
+        {date}
+      </span>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const [stats, setStats]  = useState(null);
+  const [runs, setRuns]    = useState([]);
+  const [loading, setLoad] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/api/v1/stats`)
-      .then((r) => r.json())
-      .then((d) => { setStats(d); setLoading(false); })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch(`${API}/api/v1/stats`).then((r) => r.json()).catch(() => null),
+      fetch(`${API}/api/v1/collector-runs`).then((r) => r.json()).catch(() => []),
+    ]).then(([s, r]) => {
+      setStats(s);
+      setRuns(Array.isArray(r) ? r.slice(0, 8) : []);
+      setLoad(false);
+    });
   }, []);
 
+  const fmt = (n) => (n != null ? Number(n).toLocaleString("pt-BR") : "—");
+
   const kpis = [
-    {
-      icon: BookOpen,
-      label: "Publicações coletadas",
-      value: loading ? "…" : (stats?.publications ?? 0).toLocaleString("pt-BR"),
-      sub: "via OpenAlex",
-      color: "#9333EA",
-    },
-    {
-      icon: Users,
-      label: "Pesquisadores mapeados",
-      value: loading ? "…" : (stats?.researchers ?? 0).toLocaleString("pt-BR"),
-      sub: "UFV, únicos",
-      color: "#D4A017",
-    },
-    {
-      icon: Clock,
-      label: "Última atualização",
-      value: loading ? "…" : (stats?.last_collected
-        ? new Date(stats.last_collected).toLocaleDateString("pt-BR")
-        : "—"),
-      sub: stats?.last_collected ? "coleta concluída" : "aguardando primeira coleta",
-      color: "#34d399",
-    },
-    {
-      icon: CalendarClock,
-      label: "Próxima coleta",
-      value: loading ? "…" : (stats?.next_collection ?? "—"),
-      sub: "refresh incremental",
-      color: "#9475B4",
-    },
+    { icon: BookOpen,     label: "Publicações",    value: fmt(stats?.publications),    sub: "OpenAlex + LOCUS",        color: "#A78BFA" },
+    { icon: FlaskConical, label: "Patentes",        value: fmt(stats?.patents),          sub: "INPI + Lens.org",         color: "#F59E0B" },
+    { icon: Users,        label: "Pesquisadores",   value: fmt(stats?.researchers),      sub: "com Lattes / ORCID",      color: "#34D399" },
+    { icon: Users,        label: "Grupos CNPq",     value: fmt(stats?.research_groups),  sub: "via DGP",                 color: "#60A5FA" },
+    { icon: FileText,     label: "Editais Ativos",  value: fmt(stats?.opportunities),    sub: "FAPEMIG · FINEP · CNPq",  color: "#FB7185" },
+    { icon: BarChart3,    label: "Gaps Importação", value: fmt(stats?.import_gaps),      sub: "Comex Stat 2023",         color: "#FBBF24" },
+    { icon: TrendingUp,   label: "Tendências",      value: fmt(stats?.market_trends),    sub: "Google Trends (5 anos)",  color: "#C084FC" },
+    { icon: Database,     label: "Coletas",         value: fmt(stats?.collector_runs),   sub: "Total de runs",           color: "var(--text-muted)" },
   ];
 
   return (
-    <div className="p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Visão Geral</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            Radar de Inteligência de Inovação · NIT-UFV
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Visão Geral</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+          Radar de Inteligência de Inovação · NIT-UFV
+        </p>
+      </div>
+
+      {/* 8 KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
+      </div>
+
+      {/* Últimas coletas */}
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={16} style={{ color: "var(--accent-hover)" }} />
+          <h2 className="text-sm font-semibold text-white">Últimas Coletas</h2>
+        </div>
+        {loading && (
+          <p className="text-sm py-4 text-center" style={{ color: "var(--text-muted)" }}>Carregando…</p>
+        )}
+        {!loading && runs.length === 0 && (
+          <p className="text-sm py-4 text-center" style={{ color: "var(--text-muted)" }}>
+            Nenhuma coleta registrada. Execute <code>make collect-all ingest-all</code>.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {stats ? (
-            <span className="text-xs text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-              API conectada
-            </span>
-          ) : (
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {loading ? "conectando…" : "API offline"}
-            </span>
-          )}
-        </div>
+        )}
+        {runs.map((r) => <RunRow key={r.id} run={r} />)}
+        {runs.length > 0 && (
+          <div className="pt-3">
+            <a href="/collectors" className="text-xs" style={{ color: "var(--accent-hover)" }}>
+              Ver histórico completo →
+            </a>
+          </div>
+        )}
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-4 gap-4">
-        {kpis.map(({ icon: Icon, label, value, sub, color }) => (
-          <Card key={label}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
-                <p className="text-2xl font-bold text-white">{value}</p>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{sub}</p>
-              </div>
-              <div className="p-2 rounded-lg" style={{ background: color + "20" }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-            </div>
-          </Card>
-        ))}
+      {/* Fontes */}
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      >
+        <h2 className="text-sm font-semibold text-white mb-4">Fontes de Dados</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                {["Fonte", "Camada", "Volume estimado", "Frequência", "Status"].map((h) => (
+                  <th key={h} className="text-left pb-2 pr-6 text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: "var(--text-muted)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["OpenAlex (UFV)",    "Publicações",  "~47K works",     "Mensal",     "ok"],
+                ["LOCUS DSpace",      "Publicações",  "~25K teses",     "Semanal",    "ok"],
+                ["INPI 775K",         "Patentes",     "775K pedidos BR","Semestral",  "ok"],
+                ["Google Patents",    "Patentes",     "~235 UFV",       "Mensal",     "ok"],
+                ["DGP/CNPq",          "Grupos",       "~120 grupos",    "Mensal",     "ok"],
+                ["Lens.org",          "Patentes",     "CSV manual",     "Mensal",     "manual"],
+                ["Editais (4 fontes)","Oportunidades","variável",        "Semanal",   "ok"],
+                ["Comex Stat",        "Mercado",      "200 gaps SH4",   "Mensal",     "ok"],
+                ["Google Trends",     "Mercado",      "32 keywords",    "Quinzenal",  "ok"],
+              ].map(([fonte, camada, vol, freq, status]) => (
+                <tr key={fonte} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <td className="py-2.5 pr-6 text-white font-medium">{fonte}</td>
+                  <td className="py-2.5 pr-6" style={{ color: "var(--text-muted)" }}>{camada}</td>
+                  <td className="py-2.5 pr-6 tabular-nums" style={{ color: "var(--text-muted)" }}>{vol}</td>
+                  <td className="py-2.5 pr-6" style={{ color: "var(--text-muted)" }}>{freq}</td>
+                  <td className="py-2.5">
+                    <Badge variant={status === "ok" ? "success" : status === "manual" ? "gold" : "muted"}>
+                      {status}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-
-      {/* Placeholder sinais */}
-      <Card style={{ borderColor: "#6B21A840" }}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Radio size={15} style={{ color: "var(--accent)" }} />
-            Sinais do Radar
-          </CardTitle>
-        </CardHeader>
-        <div className="flex flex-col items-center justify-center py-12 gap-4">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-          >
-            <Zap size={28} style={{ color: "var(--text-muted)" }} />
-          </div>
-          <div className="text-center">
-            <p className="text-white font-medium mb-1">
-              Sinais ainda não disponíveis
-            </p>
-            <p className="text-sm max-w-md" style={{ color: "var(--text-muted)" }}>
-              Aguardando dados suficientes para gerar matches.
-              Execute a coleta OpenAlex e ingira os dados para ativar o radar.
-            </p>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <Badge variant="muted">Fase 1: Coleta de dados</Badge>
-            <Badge variant="muted">Fase 2: Embeddings</Badge>
-            <Badge variant="muted">Fase 3: Radar ativo</Badge>
-          </div>
-        </div>
-      </Card>
-
-      {/* Status das fontes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Fontes de Dados</CardTitle>
-        </CardHeader>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { name: "OpenAlex",    desc: "Publicações UFV",      status: "ativo",     color: "#34d399" },
-            { name: "LOCUS",       desc: "Teses e dissertações", status: "planejado", color: "#9475B4" },
-            { name: "Lens.org",    desc: "Citações PI↔Scholar",  status: "planejado", color: "#9475B4" },
-            { name: "INPI 775K",   desc: "Patentes brasileiras", status: "planejado", color: "#9475B4" },
-            { name: "FAPEMIG/FINEP", desc: "Editais abertos",    status: "planejado", color: "#9475B4" },
-            { name: "Comex Stat",  desc: "Importações por setor",status: "planejado", color: "#9475B4" },
-          ].map((src) => (
-            <div
-              key={src.name}
-              className="flex items-center gap-3 p-3 rounded-lg"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
-            >
-              <div
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: src.color }}
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-white">{src.name}</p>
-                <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{src.desc}</p>
-              </div>
-              <Badge
-                variant={src.status === "ativo" ? "success" : "muted"}
-                className="ml-auto shrink-0"
-              >
-                {src.status}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Footer */}
-      <p className="text-xs text-center pb-4" style={{ color: "var(--text-muted)" }}>
-        Powered by Argos · Parceria piloto: NIT.UFV
-      </p>
     </div>
   );
 }
