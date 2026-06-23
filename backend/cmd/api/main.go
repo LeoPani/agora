@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/LeoPani/agora/backend/internal/config"
 	"github.com/LeoPani/agora/backend/internal/platform/database"
 	"github.com/LeoPani/agora/backend/internal/platform/logger"
@@ -204,9 +206,11 @@ func run() error {
 		limit := limitParam(r, 500)
 		ufvOnly := r.URL.Query().Get("ufv") == "true"
 
-		q := `SELECT id, inpi_number, title, abstract, filing_date, status, is_ufv, ipc_codes FROM patents`
+		q := `SELECT id, inpi_number, title, abstract, filing_date, legal_status,
+		             applicant_type = 'UFV' AS is_ufv, ipc_codes
+		      FROM patents`
 		if ufvOnly {
-			q += " WHERE is_ufv = true"
+			q += " WHERE applicant_type = 'UFV'"
 		}
 		q += " ORDER BY filing_date DESC NULLS LAST LIMIT $1"
 
@@ -218,23 +222,22 @@ func run() error {
 		defer rows.Close()
 
 		type pat struct {
-			ID          int64    `json:"id"`
-			INPINumber  *string  `json:"inpi_number"`
-			Title       *string  `json:"title"`
-			Abstract    *string  `json:"abstract"`
-			FilingDate  *string  `json:"filing_date"`
-			Status      *string  `json:"status"`
-			IsUFV       bool     `json:"is_ufv"`
-			IPCCodes    []string `json:"ipc_codes"`
+			ID         int64    `json:"id"`
+			INPINumber *string  `json:"inpi_number"`
+			Title      *string  `json:"title"`
+			Abstract   *string  `json:"abstract"`
+			FilingDate *string  `json:"filing_date"`
+			Status     *string  `json:"status"`
+			IsUFV      bool     `json:"is_ufv"`
+			IPCCodes   []string `json:"ipc_codes"`
 		}
 		var result []pat
 		for rows.Next() {
 			var p pat
-			var ipcJSON []byte
-			rows.Scan(&p.ID, &p.INPINumber, &p.Title, &p.Abstract, &p.FilingDate, &p.Status, &p.IsUFV, &ipcJSON)
-			if ipcJSON != nil {
-				json.Unmarshal(ipcJSON, &p.IPCCodes)
-			}
+			var ipcArr []string
+			rows.Scan(&p.ID, &p.INPINumber, &p.Title, &p.Abstract, &p.FilingDate,
+				&p.Status, &p.IsUFV, pq.Array(&ipcArr))
+			p.IPCCodes = ipcArr
 			result = append(result, p)
 		}
 		if result == nil {
@@ -268,11 +271,8 @@ func run() error {
 		var result []grp
 		for rows.Next() {
 			var g grp
-			var linesJSON []byte
-			rows.Scan(&g.ID, &g.DGPID, &g.Name, &g.Leader, &g.Department, &linesJSON, &g.MainArea, &g.FormationYear)
-			if linesJSON != nil {
-				json.Unmarshal(linesJSON, &g.ResearchLines)
-			}
+			rows.Scan(&g.ID, &g.DGPID, &g.Name, &g.Leader, &g.Department,
+				pq.Array(&g.ResearchLines), &g.MainArea, &g.FormationYear)
 			result = append(result, g)
 		}
 		if result == nil {
@@ -285,8 +285,8 @@ func run() error {
 	mux.HandleFunc("GET /api/v1/opportunities", cors(func(w http.ResponseWriter, r *http.Request) {
 		limit := limitParam(r, 200)
 		rows, err := db.QueryContext(r.Context(), `
-			SELECT id, source, external_id, title, description, url, deadline, status
-			FROM opportunities ORDER BY created_at DESC LIMIT $1`, limit)
+			SELECT id, source, external_id, title, description, url, closing_date::text, status
+			FROM opportunities ORDER BY collected_at DESC LIMIT $1`, limit)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -342,12 +342,8 @@ func run() error {
 		var result []gap
 		for rows.Next() {
 			var g gap
-			var areasJSON []byte
 			rows.Scan(&g.ID, &g.SH4Code, &g.Description, &g.CountryOrigin, &g.Year,
-				&g.ImportValueUSD, &g.ImportKG, &areasJSON, &g.OpportunityScore)
-			if areasJSON != nil {
-				json.Unmarshal(areasJSON, &g.UFVRelatedAreas)
-			}
+				&g.ImportValueUSD, &g.ImportKG, pq.Array(&g.UFVRelatedAreas), &g.OpportunityScore)
 			result = append(result, g)
 		}
 		if result == nil {

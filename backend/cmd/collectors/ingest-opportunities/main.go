@@ -148,20 +148,18 @@ func ingestFile(ctx context.Context, log *slog.Logger, db *sql.DB, path string) 
 
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO opportunities
-			  (source, external_id, title, description, url, deadline, status, raw_data)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			  (source, external_id, title, description, url, status, raw_data)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (source, external_id) DO UPDATE SET
 			  title       = EXCLUDED.title,
 			  description = EXCLUDED.description,
 			  url         = EXCLUDED.url,
-			  deadline    = EXCLUDED.deadline,
 			  status      = EXCLUDED.status`,
 			op.Source,
 			op.ExternalID,
 			op.Title,
 			nullStr(op.Description),
 			nullStr(op.URL),
-			nullStr(op.Deadline),
 			statusOr(op.Status),
 			string(rawJSON),
 		)
