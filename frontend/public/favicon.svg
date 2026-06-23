@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0d0a1a"/>
+  <g transform="translate(16, 18)">
+    <!-- horizonte -->
+    <line x1="-12" y1="4" x2="12" y2="4" stroke="#6B21A8" stroke-width="0.8"/>
+    <!-- olho pontudo -->
+    <path d="M -6 1 Q -4 -1 0 -1 Q 4 -1 6 1 Q 4 3 0 3 Q -4 3 -6 1 Z"
+          fill="#1A1329" stroke="#6B21A8" stroke-width="0.8"/>
+    <circle cx="0" cy="1" r="1.6" fill="#D4A017"/>
+    <circle cx="0" cy="1" r="0.7" fill="#0d0a1a"/>
+    <!-- 4 colunas mini -->
+    <rect x="-10" y="-4"  width="2" height="8" fill="#6B21A8"/>
+    <rect x="-5"  y="-3"  width="2" height="7" fill="#6B21A8"/>
+    <rect x="3"   y="-3"  width="2" height="7" fill="#6B21A8"/>
+    <rect x="8"   y="-4"  width="2" height="8" fill="#6B21A8"/>
+  </g>
+</svg>

@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Search, ExternalLink, Building2, User, Linkedin, BookOpen } from "lucide-react";
+import { Search, ExternalLink, Building2, User, Link2, BookOpen } from "lucide-react";
+
+function LinkedInIcon({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z"/>
+      <rect x="2" y="9" width="4" height="12"/>
+      <circle cx="4" cy="4" r="2"/>
+    </svg>
+  );
+}
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081";
 
@@ -102,7 +112,7 @@ function PartnerCard({ partner }) {
           {partner.linkedin_url && (
             <a href={partner.linkedin_url} target="_blank" rel="noreferrer"
               className="flex items-center gap-1 text-xs" style={{ color: "#0A66C2" }}>
-              <Linkedin size={11} /> LinkedIn
+              <LinkedInIcon size={11} /> LinkedIn
             </a>
           )}
           {partner.contact_email && (
@@ -128,7 +138,7 @@ function LinkedInLeadsPanel({ leads }) {
         onClick={() => setOpen((o) => !o)}
       >
         <div className="flex items-center gap-2">
-          <Linkedin size={14} style={{ color: "#0A66C2" }} />
+          <LinkedInIcon size={14} />
           <span className="text-sm font-semibold text-white">Prospecção LinkedIn</span>
           <Badge variant="gold">{leads.total_queries} queries</Badge>
         </div>
@@ -147,7 +157,7 @@ function LinkedInLeadsPanel({ leads }) {
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--border)"}
               >
                 <div className="flex items-center gap-2">
-                  <Linkedin size={12} style={{ color: "#0A66C2" }} />
+                  <LinkedInIcon size={12} />
                   <span className="text-xs font-medium text-white truncate">{s.keyword}</span>
                 </div>
                 <div className="flex gap-1 flex-wrap">

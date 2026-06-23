@@ -1,55 +1,126 @@
 @import "tailwindcss";
 
 :root {
-  --bg:          #0D0B14;
-  --surface:     #1A1329;
-  --surface-2:   #221640;
-  --border:      #3D2B5C;
-  --text:        #e2e8f0;
-  --text-muted:  #9475B4;
-  --accent:      #6B21A8;
-  --accent-hover:#9333EA;
-  --gold:        #D4A017;
+  --bg:           #0d0a1a;
+  --surface:      #1A1329;
+  --surface-2:    #221640;
+  --border:       rgba(107, 33, 168, 0.2);
+  --purple:       #6B21A8;
+  --purple-soft:  rgba(107, 33, 168, 0.2);
+  --purple-faint: rgba(107, 33, 168, 0.08);
+  --gold:         #D4A017;
+  --gold-soft:    rgba(212, 160, 23, 0.2);
+  --text:         #ffffff;
+  --text-muted:   rgba(255, 255, 255, 0.6);
+  --text-dim:     rgba(255, 255, 255, 0.4);
+  --accent:       #6B21A8;
+  --accent-hover: #9333EA;
 }
 
 * { box-sizing: border-box; }
 
 body {
-  background-color: var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
+/* ── Scrollbar ────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #5D3B7C; }
+::-webkit-scrollbar-thumb { background: rgba(107,33,168,0.4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(107,33,168,0.7); }
 
+/* ── Base transitions ─────────────────── */
+button, a, input, select, textarea {
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+              color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2) !important;
+  outline: none;
+}
+
+/* ── Recharts ─────────────────────────── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line { stroke: var(--border); }
 .recharts-text { fill: var(--text-muted) !important; font-size: 12px; }
 
-button, a, input, select, textarea {
-  transition:
-    background-color 0.15s ease,
-    border-color     0.15s ease,
-    color            0.15s ease,
-    transform        0.1s  ease,
-    box-shadow       0.15s ease;
+/* ── View transitions ────────────────── */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) {
+  animation: agora-fade-out 0.25s ease forwards;
+}
+::view-transition-new(root) {
+  animation: agora-fade-in 0.35s ease forwards;
 }
 
-input:focus, select:focus, textarea:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(107, 33, 168, 0.2);
+@keyframes agora-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes agora-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Page entry animation ────────────── */
+.page-enter {
+  animation: page-in 0.45s ease forwards;
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Staggered cards ─────────────────── */
+.stagger > * {
+  opacity: 0;
+  animation: card-in 0.4s ease forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger > *:nth-child(5) { animation-delay: 0.20s; }
+.stagger > *:nth-child(6) { animation-delay: 0.24s; }
+.stagger > *:nth-child(7) { animation-delay: 0.28s; }
+.stagger > *:nth-child(8) { animation-delay: 0.32s; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card hover ───────────────────────── */
+.card-hover {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-soft) !important;
+}
+
+/* ── Sidebar item active ─────────────── */
+.nav-active {
+  background: var(--purple-soft);
+  border-left: 3px solid var(--gold);
+  padding-left: calc(0.75rem - 3px);
+}
+
+/* ── Pulse / fade-in utils ───────────── */
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 @keyframes pulse {
   0%, 100% { opacity: 0.4; }
-  50%      { opacity: 0.6; }
+  50%       { opacity: 0.7; }
 }
 
 .fade-in {
@@ -60,6 +131,25 @@ input:focus, select:focus, textarea:focus {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Intro overlay ───────────────────── */
+.agora-intro {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: pointer;
+  transition: opacity 1s ease, visibility 1s ease;
+}
+.agora-intro.fading {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Presentation mode ───────────────── */
 html.presentation-mode aside {
   transform: translateX(-100%);
   transition: transform 0.3s ease;
@@ -67,6 +157,15 @@ html.presentation-mode aside {
 html.presentation-mode main {
   margin-left: 0 !important;
   transition: margin 0.3s ease;
+}
+
+/* ── Mobile ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .agora-intro { display: none !important; }
 }
 
 @media (max-width: 768px) {
