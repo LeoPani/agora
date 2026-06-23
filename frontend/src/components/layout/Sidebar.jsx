@@ -12,6 +12,7 @@ import {
   FileText,
   BarChart3,
   TrendingUp,
+  Handshake,
   Database,
   Settings,
   ChevronLeft,
@@ -29,6 +30,7 @@ const sections = [
       { href: "/opportunities",icon: FileText,        label: "Oportunidades"  },
       { href: "/imports",      icon: BarChart3,       label: "Importações"    },
       { href: "/trends",       icon: TrendingUp,      label: "Tendências"     },
+      { href: "/partners",     icon: Handshake,       label: "Interessados"   },
     ],
   },
   {

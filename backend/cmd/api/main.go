@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -386,6 +387,83 @@ func run() error {
 			result = []trend{}
 		}
 		json.NewEncoder(w).Encode(result)
+	}))
+
+	// ── /api/v1/partners ───────────────────────────────────────────────────────
+	mux.HandleFunc("GET /api/v1/partners", cors(func(w http.ResponseWriter, r *http.Request) {
+		limit      := limitParam(r, 200)
+		src        := r.URL.Query().Get("source")
+		ptype      := r.URL.Query().Get("type")
+		q          := r.URL.Query().Get("q")
+
+		query := `SELECT id, name, cnpj, partner_type, sector, location,
+		                 cnae_code, lattes_id, linkedin_url, contact_email,
+		                 interest_score, source, n_citations_to_ufv
+		          FROM partners WHERE 1=1`
+		args := []interface{}{}
+		n := 1
+
+		if src != "" {
+			query += fmt.Sprintf(" AND source = $%d", n)
+			args = append(args, src); n++
+		}
+		if ptype != "" {
+			query += fmt.Sprintf(" AND partner_type = $%d", n)
+			args = append(args, ptype); n++
+		}
+		if q != "" {
+			query += fmt.Sprintf(" AND (name ILIKE $%d OR sector ILIKE $%d)", n, n)
+			args = append(args, "%"+q+"%"); n++
+		}
+		query += fmt.Sprintf(" ORDER BY interest_score DESC LIMIT $%d", n)
+		args = append(args, limit)
+
+		rows, err := db.QueryContext(r.Context(), query, args...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type partner struct {
+			ID             int64   `json:"id"`
+			Name           string  `json:"name"`
+			CNPJ           *string `json:"cnpj"`
+			PartnerType    *string `json:"partner_type"`
+			Sector         *string `json:"sector"`
+			Location       *string `json:"location"`
+			CNAECode       *string `json:"cnae_code"`
+			LattesID       *string `json:"lattes_id"`
+			LinkedInURL    *string `json:"linkedin_url"`
+			ContactEmail   *string `json:"contact_email"`
+			InterestScore  float64 `json:"interest_score"`
+			Source         *string `json:"source"`
+			NCitationsUFV  int     `json:"n_citations_to_ufv"`
+		}
+		var result []partner
+		for rows.Next() {
+			var p partner
+			rows.Scan(&p.ID, &p.Name, &p.CNPJ, &p.PartnerType, &p.Sector, &p.Location,
+				&p.CNAECode, &p.LattesID, &p.LinkedInURL, &p.ContactEmail,
+				&p.InterestScore, &p.Source, &p.NCitationsUFV)
+			result = append(result, p)
+		}
+		if result == nil {
+			result = []partner{}
+		}
+		json.NewEncoder(w).Encode(result)
+	}))
+
+	// ── /api/v1/linkedin-leads ─────────────────────────────────────────────────
+	mux.HandleFunc("GET /api/v1/linkedin-leads", cors(func(w http.ResponseWriter, r *http.Request) {
+		leadsPath := "../ai-service/data/linkedin_search_leads.json"
+		data, err := os.ReadFile(leadsPath)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Rode: make collect-linkedin"})
+			return
+		}
+		w.Write(data)
 	}))
 
 	srv := &http.Server{

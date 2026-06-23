@@ -8,6 +8,7 @@
         collect-editais ingest-opportunities \
         collect-comex ingest-comex \
         collect-trends ingest-trends \
+        collect-partners collect-linkedin ingest-partners \
         collect-all ingest-all \
         run-api run-frontend run-scheduler build clean
 
@@ -71,6 +72,13 @@ collect-comex: ## Comex Stat — gaps de importação (API MDIC)
 collect-trends: ## Google Trends — 32 keywords × 8 depts UFV
 	cd ai-service && ./venv/bin/python3 collectors/trends_collector.py
 
+collect-partners: ## Interessados — empresas via CNPJ/Receita + pesquisadores via Lattes
+	cd ai-service && ./venv/bin/python3 collectors/cnpj_partners_collector.py
+	cd ai-service && ./venv/bin/python3 collectors/lattes_partners_collector.py
+
+collect-linkedin: ## LinkedIn — gera queries de prospecção (sem scraping)
+	cd ai-service && ./venv/bin/python3 collectors/linkedin_finder.py
+
 collect-all: ## Roda TODOS os coletores em sequência (exceto Lens — manual)
 	$(MAKE) collect-openalex
 	$(MAKE) collect-locus
@@ -109,6 +117,9 @@ ingest-comex: ## Ingere gaps de importação no Postgres
 ingest-trends: ## Ingere tendências de mercado no Postgres
 	cd backend && go run ./cmd/collectors/ingest-trends
 
+ingest-partners: ## Ingere parceiros/interessados no Postgres
+	cd backend && go run ./cmd/collectors/ingest-partners
+
 ingest-all: ## Roda TODOS os ingestores em sequência
 	$(MAKE) ingest-openalex
 	$(MAKE) ingest-locus
@@ -118,6 +129,7 @@ ingest-all: ## Roda TODOS os ingestores em sequência
 	$(MAKE) ingest-opportunities
 	$(MAKE) ingest-comex
 	$(MAKE) ingest-trends
+	$(MAKE) ingest-partners
 
 # ── Dev ────────────────────────────────────────────────────────────────────────
 
