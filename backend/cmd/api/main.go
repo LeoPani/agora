@@ -1,5 +1,5 @@
 // agora-api é o servidor HTTP principal do Ágora.
-// Por enquanto expõe apenas /health e /api/v1/stats (contagens básicas).
+// Endpoints: /health, /api/v1/stats, /api/v1/collector-runs
 package main
 
 import (
@@ -75,6 +75,54 @@ func run() error {
 			"last_collected":  lastCollected,
 			"next_collection": nextCollection,
 		})
+	})
+
+	mux.HandleFunc("GET /api/v1/collector-runs", func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.QueryContext(r.Context(), `
+			SELECT id, collector_name, started_at, finished_at, status, records_collected, error_message
+			FROM collector_runs
+			ORDER BY started_at DESC
+			LIMIT 100`)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type run struct {
+			ID               int64   `json:"id"`
+			CollectorName    string  `json:"collector_name"`
+			StartedAt        string  `json:"started_at"`
+			FinishedAt       *string `json:"finished_at"`
+			Status           *string `json:"status"`
+			RecordsCollected int     `json:"records_collected"`
+			ErrorMessage     *string `json:"error_message"`
+		}
+
+		var result []run
+		for rows.Next() {
+			var ru run
+			var finishedAt *time.Time
+			var status, errMsg *string
+			if err := rows.Scan(&ru.ID, &ru.CollectorName, &ru.StartedAt,
+				&finishedAt, &status, &ru.RecordsCollected, &errMsg); err != nil {
+				continue
+			}
+			if finishedAt != nil {
+				s := finishedAt.Format(time.RFC3339)
+				ru.FinishedAt = &s
+			}
+			ru.Status = status
+			ru.ErrorMessage = errMsg
+			result = append(result, ru)
+		}
+		if result == nil {
+			result = []run{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(w).Encode(result)
 	})
 
 	srv := &http.Server{
