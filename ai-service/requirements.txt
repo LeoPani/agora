@@ -2,3 +2,5 @@ requests>=2.31.0
 beautifulsoup4>=4.12.0
 datasets>=2.18.0
 pytrends>=4.9.2
+sentence-transformers>=3.0.0
+psycopg2-binary>=2.9.0

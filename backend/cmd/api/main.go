@@ -1,7 +1,8 @@
 // agora-api — servidor HTTP principal.
 // Endpoints: /health, /api/v1/stats, /api/v1/collector-runs,
 //            /api/v1/publications, /api/v1/patents, /api/v1/groups,
-//            /api/v1/opportunities, /api/v1/import-gaps, /api/v1/trends
+//            /api/v1/opportunities, /api/v1/import-gaps, /api/v1/trends,
+//            /api/v1/search (busca semântica via pgvector)
 package main
 
 import (
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/pgvector/pgvector-go"
 
 	"github.com/LeoPani/agora/backend/internal/config"
 	"github.com/LeoPani/agora/backend/internal/platform/database"
@@ -452,6 +454,142 @@ func run() error {
 			result = []partner{}
 		}
 		json.NewEncoder(w).Encode(result)
+	}))
+
+	// ── /api/v1/search ────────────────────────────────────────────────────────
+	// Busca semântica via pgvector — requer embeddings gerados.
+	// Parâmetros: ?q=texto&type=all|publications|patents&limit=20
+	mux.HandleFunc("GET /api/v1/search", cors(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("q")
+		if q == "" {
+			http.Error(w, `{"error":"q is required"}`, http.StatusBadRequest)
+			return
+		}
+		entityType := r.URL.Query().Get("type")
+		if entityType == "" {
+			entityType = "all"
+		}
+		limit := limitParam(r, 20)
+
+		// Chama função de embedding via endpoint interno do ai-service
+		embURL := "http://localhost:8082/embed?text=" + q
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Get(embURL)
+		if err != nil || resp.StatusCode != 200 {
+			// Fallback: busca lexical quando embeddings não disponíveis
+			type result struct {
+				ID     int64   `json:"id"`
+				Title  string  `json:"title"`
+				Score  float64 `json:"score"`
+				Source string  `json:"source"`
+				Type   string  `json:"type"`
+			}
+			var results []result
+			likeQ := "%" + q + "%"
+			if entityType == "all" || entityType == "publications" {
+				rows, _ := db.QueryContext(r.Context(), `
+					SELECT id, title, 0.5 as score, source, 'publication' as type
+					FROM publications
+					WHERE title ILIKE $1 OR abstract ILIKE $1
+					ORDER BY cited_by_count DESC LIMIT $2`, likeQ, limit)
+				if rows != nil {
+					defer rows.Close()
+					for rows.Next() {
+						var res result
+						rows.Scan(&res.ID, &res.Title, &res.Score, &res.Source, &res.Type)
+						results = append(results, res)
+					}
+				}
+			}
+			if entityType == "all" || entityType == "patents" {
+				rows, _ := db.QueryContext(r.Context(), `
+					SELECT id, title, 0.5 as score, 'inpi' as source, 'patent' as type
+					FROM patents
+					WHERE title ILIKE $1 OR abstract ILIKE $1
+					ORDER BY id DESC LIMIT $2`, likeQ, limit)
+				if rows != nil {
+					defer rows.Close()
+					for rows.Next() {
+						var res result
+						rows.Scan(&res.ID, &res.Title, &res.Score, &res.Source, &res.Type)
+						results = append(results, res)
+					}
+				}
+			}
+			if results == nil {
+				results = []result{}
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"mode":    "lexical",
+				"query":   q,
+				"results": results,
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		var embData struct {
+			Embedding []float32 `json:"embedding"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&embData); err != nil || len(embData.Embedding) == 0 {
+			http.Error(w, `{"error":"embedding decode failed"}`, http.StatusInternalServerError)
+			return
+		}
+		vec := pgvector.NewVector(embData.Embedding)
+
+		type result struct {
+			ID       int64   `json:"id"`
+			Title    string  `json:"title"`
+			Abstract *string `json:"abstract,omitempty"`
+			Score    float64 `json:"score"`
+			Source   string  `json:"source"`
+			Type     string  `json:"type"`
+		}
+		var results []result
+
+		if entityType == "all" || entityType == "publications" {
+			rows, err := db.QueryContext(r.Context(), `
+				SELECT id, title, abstract, source,
+				       1 - (embedding <=> $1) AS score
+				FROM publications
+				WHERE embedding IS NOT NULL
+				ORDER BY embedding <=> $1
+				LIMIT $2`, vec, limit)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var res result
+					res.Type = "publication"
+					rows.Scan(&res.ID, &res.Title, &res.Abstract, &res.Source, &res.Score)
+					results = append(results, res)
+				}
+			}
+		}
+		if entityType == "all" || entityType == "patents" {
+			rows, err := db.QueryContext(r.Context(), `
+				SELECT id, title, abstract, 'inpi' as source,
+				       1 - (embedding <=> $1) AS score
+				FROM patents
+				WHERE embedding IS NOT NULL
+				ORDER BY embedding <=> $1
+				LIMIT $2`, vec, limit)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var res result
+					res.Type = "patent"
+					rows.Scan(&res.ID, &res.Title, &res.Abstract, &res.Source, &res.Score)
+					results = append(results, res)
+				}
+			}
+		}
+		if results == nil {
+			results = []result{}
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"mode":    "semantic",
+			"query":   q,
+			"results": results,
+		})
 	}))
 
 	// ── /api/v1/linkedin-leads ─────────────────────────────────────────────────

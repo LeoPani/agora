@@ -9,6 +9,7 @@
         collect-comex ingest-comex \
         collect-trends ingest-trends \
         collect-partners collect-linkedin ingest-partners \
+        embed embed-publications embed-patents embed-server ingest-embeddings \
         collect-all ingest-all \
         run-api run-frontend run-scheduler build clean
 
@@ -71,6 +72,21 @@ collect-comex: ## Comex Stat — gaps de importação (API MDIC)
 
 collect-trends: ## Google Trends — 32 keywords × 8 depts UFV
 	cd ai-service && ./venv/bin/python3 collectors/trends_collector.py
+
+embed: ## Gera embeddings semânticos (publicações + patentes)
+	cd ai-service && ./venv/bin/python3 collectors/embedder.py
+
+embed-publications: ## Gera embeddings só de publicações
+	cd ai-service && ./venv/bin/python3 collectors/embedder.py --entity publications
+
+embed-patents: ## Gera embeddings só de patentes
+	cd ai-service && ./venv/bin/python3 collectors/embedder.py --entity patents
+
+embed-server: ## Sobe servidor de embedding na porta 8082
+	cd ai-service && ./venv/bin/python3 embed_server.py
+
+ingest-embeddings: ## Ingere vetores semânticos no Postgres (pgvector)
+	cd backend && go run ./cmd/collectors/ingest-embeddings
 
 collect-partners: ## Interessados — empresas via CNPJ/Receita + pesquisadores via Lattes
 	cd ai-service && ./venv/bin/python3 collectors/cnpj_partners_collector.py
@@ -158,7 +174,8 @@ build: ## Compila todos os binários Go para backend/dist/
 		go build -o dist/agora-ingest-lens      ./cmd/collectors/ingest-lens && \
 		go build -o dist/agora-ingest-opportunities ./cmd/collectors/ingest-opportunities && \
 		go build -o dist/agora-ingest-comex     ./cmd/collectors/ingest-comex && \
-		go build -o dist/agora-ingest-trends    ./cmd/collectors/ingest-trends
+		go build -o dist/agora-ingest-trends      ./cmd/collectors/ingest-trends && \
+		go build -o dist/agora-ingest-embeddings ./cmd/collectors/ingest-embeddings
 
 clean: ## Remove artefatos de build e dados coletados
 	rm -rf backend/dist

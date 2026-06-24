@@ -19,7 +19,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-UFV_OPENALEX_ID = "I4310312296"
+UFV_OPENALEX_ID = "I146165071"
 BASE_URL = "https://api.openalex.org"
 MAILTO = "agora@argos.dev"
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
@@ -91,7 +91,7 @@ def collect_all():
                 "cited_by_count": work.get("cited_by_count", 0),
                 "topics": [
                     {
-                        "id": t.get("id", "").replace("https://openalex.org/", ""),
+                        "id": (t.get("id") or "").replace("https://openalex.org/", ""),
                         "name": t.get("display_name"),
                         "score": t.get("score"),
                     }
@@ -102,7 +102,7 @@ def collect_all():
 
             for idx, authorship in enumerate(work.get("authorships", []) or []):
                 author = authorship.get("author") or {}
-                author_id = author.get("id", "").replace("https://openalex.org/", "")
+                author_id = (author.get("id") or "").replace("https://openalex.org/", "")
                 full_name = author.get("display_name") or ""
                 norm = normalize_name(full_name)
                 if not norm:
@@ -110,7 +110,7 @@ def collect_all():
 
                 institutions = authorship.get("institutions") or []
                 is_ufv = any(
-                    i.get("id", "").endswith(UFV_OPENALEX_ID)
+                    (i.get("id") or "").endswith(UFV_OPENALEX_ID)
                     for i in institutions
                 )
                 if not is_ufv:
