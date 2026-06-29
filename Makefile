@@ -177,6 +177,37 @@ build: ## Compila todos os binários Go para backend/dist/
 		go build -o dist/agora-ingest-trends      ./cmd/collectors/ingest-trends && \
 		go build -o dist/agora-ingest-embeddings ./cmd/collectors/ingest-embeddings
 
+# ── AI Pipeline ────────────────────────────────────────────────────────────────
+
+generate-embeddings: ## Gera embeddings de publicações, patentes e oportunidades
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py
+
+generate-embeddings-publications: ## Gera embeddings só de publicações
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --entity publications
+
+generate-embeddings-patents: ## Gera embeddings só de patentes
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --entity patents
+
+generate-embeddings-opportunities: ## Gera embeddings de oportunidades
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --entity opportunities
+
+extract-editais: ## Re-extrai editais com LLM (requer GROQ_API_KEY)
+	cd ai-service && ./venv/bin/python3 extractors/edital_extractor.py --all
+
+eval-rag: ## Avaliação manual do Oráculo (RAG) — 10 perguntas de teste
+	cd ai-service && ./venv/bin/python3 eval/rag_eval.py
+
+# ── Ollama (opcional, custo zero) ──────────────────────────────────────────────
+
+ollama-pull: ## Baixa modelos Ollama para uso local
+	ollama pull llama3.1:8b
+	ollama pull nomic-embed-text
+
+ollama-serve: ## Sobe servidor Ollama local
+	ollama serve
+
+# ── Limpeza ────────────────────────────────────────────────────────────────────
+
 clean: ## Remove artefatos de build e dados coletados
 	rm -rf backend/dist
 	rm -f ai-service/data/*.jsonl ai-service/data/*.json

@@ -4,3 +4,4 @@ datasets>=2.18.0
 pytrends>=4.9.2
 sentence-transformers>=3.0.0
 psycopg2-binary>=2.9.0
+pdfplumber>=0.10.0

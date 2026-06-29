@@ -19,8 +19,10 @@ import (
 	"github.com/pgvector/pgvector-go"
 
 	"github.com/LeoPani/agora/backend/internal/config"
+	"github.com/LeoPani/agora/backend/internal/llm"
 	"github.com/LeoPani/agora/backend/internal/platform/database"
 	"github.com/LeoPani/agora/backend/internal/platform/logger"
+	"github.com/LeoPani/agora/backend/internal/rag"
 )
 
 func main() {
@@ -591,6 +593,22 @@ func run() error {
 			"results": results,
 		})
 	}))
+
+	// ── AI Layer ───────────────────────────────────────────────────────────────
+	llmCfg    := llm.LoadConfig()
+	llmRouter := llm.NewRouter(llmCfg)
+	llmLogger := llm.NewDBLogger(db, llmCfg.LogPath)
+	retriever := rag.New(db, "http://localhost:8082")
+
+	mux.HandleFunc("POST /internal/llm/complete",          llmCompleteHandler(llmRouter, llmLogger))
+	mux.HandleFunc("GET /api/v1/llm-stats",                llmStatsHandler(db))
+	mux.HandleFunc("POST /api/chat",                       chatHandler(db, retriever, llmRouter, llmLogger))
+	mux.HandleFunc("GET /api/conversations",               conversationsHandler(db))
+	mux.HandleFunc("GET /api/conversations/{id}/messages", conversationMessagesHandler(db))
+	mux.HandleFunc("GET /api/v1/signals",                  signalsHandler(db))
+	mux.HandleFunc("GET /api/v1/agent-drafts",             agentDraftsHandler(db))
+	mux.HandleFunc("PATCH /api/v1/agent-drafts/{id}",      patchDraftHandler(db))
+	mux.HandleFunc("POST /api/v1/agent-drafts/generate",   generateDraftHandler(db, llmRouter, llmLogger))
 
 	// ── /api/v1/linkedin-leads ─────────────────────────────────────────────────
 	mux.HandleFunc("GET /api/v1/linkedin-leads", cors(func(w http.ResponseWriter, r *http.Request) {

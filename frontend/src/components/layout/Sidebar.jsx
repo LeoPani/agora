@@ -17,7 +17,31 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Bot,
+  Activity,
 } from "lucide-react";
+
+function AIBadge() {
+  return (
+    <span
+      style={{
+        fontSize:    8,
+        fontWeight:  700,
+        lineHeight:  1,
+        padding:     "2px 4px",
+        borderRadius: 4,
+        background:  "rgba(212,160,23,0.2)",
+        color:       "#D4A017",
+        border:      "1px solid rgba(212,160,23,0.3)",
+        marginLeft:  4,
+        verticalAlign: "middle",
+      }}
+    >
+      AI
+    </span>
+  );
+}
 
 const sections = [
   {
@@ -34,10 +58,18 @@ const sections = [
     ],
   },
   {
+    section: "INTELIGÊNCIA",
+    items: [
+      { href: "/oraculo", icon: Sparkles, label: "Oráculo", badge: true },
+      { href: "/agente",  icon: Bot,      label: "Agente",  badge: true },
+    ],
+  },
+  {
     section: "SISTEMA",
     items: [
-      { href: "/collectors", icon: Database,  label: "Coletores"     },
-      { href: "/settings",   icon: Settings,  label: "Configurações" },
+      { href: "/collectors",        icon: Database,  label: "Coletores"     },
+      { href: "/sistema/llm-stats", icon: Activity,  label: "LLM Stats"     },
+      { href: "/settings",          icon: Settings,  label: "Configurações" },
     ],
   },
 ];
@@ -102,7 +134,7 @@ export function Sidebar() {
                 {section}
               </p>
             )}
-            {items.map(({ href, icon: Icon, label }) => {
+            {items.map(({ href, icon: Icon, label, badge }) => {
               const active = href === "/" ? path === "/" : path.startsWith(href);
               return (
                 <Link
@@ -138,7 +170,12 @@ export function Sidebar() {
                     className="shrink-0 transition-transform duration-200 group-hover:scale-110"
                     style={{ color: active ? "var(--gold)" : "inherit" }}
                   />
-                  {!collapsed && label}
+                  {!collapsed && (
+                    <span className="flex items-center">
+                      {label}
+                      {badge && <AIBadge />}
+                    </span>
+                  )}
                 </Link>
               );
             })}
