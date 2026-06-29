@@ -20,6 +20,7 @@ import {
   Sparkles,
   Bot,
   Activity,
+  GitMerge,
 } from "lucide-react";
 
 function AIBadge() {
@@ -60,8 +61,9 @@ const sections = [
   {
     section: "INTELIGÊNCIA",
     items: [
-      { href: "/oraculo", icon: Sparkles, label: "Oráculo", badge: true },
-      { href: "/agente",  icon: Bot,      label: "Agente",  badge: true },
+      { href: "/matchmaking", icon: GitMerge, label: "Matchmaking" },
+      { href: "/oraculo",     icon: Sparkles, label: "Oráculo",     badge: true },
+      { href: "/agente",      icon: Bot,       label: "Agente",      badge: true },
     ],
   },
   {
