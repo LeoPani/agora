@@ -160,6 +160,24 @@ run-scheduler: ## Sobe scheduler de coleta automática
 
 # ── Build ──────────────────────────────────────────────────────────────────────
 
+docker-build: ## Constrói todas as imagens Docker (backend + workers)
+	docker compose build
+
+docker-up: ## Sobe stack completa (postgres + migrate + api + scheduler + embed-server)
+	docker compose up -d
+
+docker-down: ## Para toda a stack
+	docker compose down
+
+docker-logs: ## Acompanha logs de todos os serviços
+	docker compose logs -f
+
+docker-collect: ## Roda coletor Python via Docker (ex: make docker-collect CMD="collectors/openalex_collector.py")
+	docker compose run --rm workers python3 $(CMD)
+
+docker-embed: ## Gera embeddings via Docker
+	docker compose run --rm workers python3 embeddings/generate_embeddings.py
+
 build: ## Compila todos os binários Go para backend/dist/
 	mkdir -p backend/dist
 	cd backend && \

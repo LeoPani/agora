@@ -1,4 +1,6 @@
 services:
+
+  # ── Banco de dados ──────────────────────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
     container_name: agora_postgres
@@ -16,6 +18,131 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - agora
+
+  # ── Migrations (roda uma vez e encerra) ─────────────────────────────────────
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: agora-backend
+    command: ["agora-migrate", "up"]
+    environment:
+      DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - agora
+
+  # ── API Go ───────────────────────────────────────────────────────────────────
+  api:
+    image: agora-backend
+    command: ["agora-api"]
+    environment:
+      DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+      API_ADDR: ":8081"
+      EMBED_SERVER_URL: "http://embed-server:8082"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      LLM_COST_LIMIT_DAILY_USD: ${LLM_COST_LIMIT_DAILY_USD:-5.00}
+      ENABLE_LLM_LOGGING: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      embed-server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - agora
+
+  # ── Scheduler de coleta automática ───────────────────────────────────────────
+  scheduler:
+    image: agora-backend
+    command: ["agora-scheduler"]
+    environment:
+      DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - agora
+
+  # ── Embed Server Python (384-dims MiniLM) ────────────────────────────────────
+  embed-server:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    image: agora-workers
+    command: ["python3", "embed_server.py"]
+    environment:
+      EMBED_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      EMBED_PORT: "8082"
+    ports:
+      - "8082:8082"
+    volumes:
+      - model_cache:/root/.cache/huggingface
+      - ./ai-service/data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health | grep -q ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - agora
+
+  # ── Frontend Next.js (opcional — use Vercel em produção) ─────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8081
+    image: agora-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - agora
+    profiles:
+      - frontend
+
+  # ── Workers Python on-demand ──────────────────────────────────────────────────
+  # Uso: docker compose run --rm workers python3 collectors/openalex_collector.py
+  #      docker compose run --rm workers python3 embeddings/generate_embeddings.py
+  workers:
+    image: agora-workers
+    environment:
+      DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+      BACKEND_URL: "http://api:8081"
+    volumes:
+      - ./ai-service/data:/app/data
+      - model_cache:/root/.cache/huggingface
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - workers
+    networks:
+      - agora
+
+networks:
+  agora:
+    driver: bridge
 
 volumes:
   postgres_data:
+  model_cache:

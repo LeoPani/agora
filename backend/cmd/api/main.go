@@ -598,7 +598,11 @@ func run() error {
 	llmCfg    := llm.LoadConfig()
 	llmRouter := llm.NewRouter(llmCfg)
 	llmLogger := llm.NewDBLogger(db, llmCfg.LogPath)
-	retriever := rag.New(db, "http://localhost:8082")
+	embedURL := os.Getenv("EMBED_SERVER_URL")
+	if embedURL == "" {
+		embedURL = "http://localhost:8082"
+	}
+	retriever := rag.New(db, embedURL)
 
 	mux.HandleFunc("POST /internal/llm/complete",          llmCompleteHandler(llmRouter, llmLogger))
 	mux.HandleFunc("GET /api/v1/llm-stats",                llmStatsHandler(db))
