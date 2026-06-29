@@ -1,0 +1,60 @@
+# Coleta editais (FAPEMIG, FINEP, CNPq, EMBRAPII) todo dia às 06:00 UTC
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: collect-editais
+  namespace: agora
+spec:
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          initContainers:
+          - name: collect
+            image: ghcr.io/leopani/agora-workers:latest
+            command: ["sh", "-c",
+              "python3 collectors/fapemig_collector.py &&
+               python3 collectors/finep_collector.py &&
+               python3 collectors/cnpq_collector.py &&
+               python3 collectors/embrapii_collector.py"]
+            envFrom:
+            - configMapRef:
+                name: agora-config
+            - secretRef:
+                name: agora-secrets
+            volumeMounts:
+            - name: data
+              mountPath: /app/data
+            resources:
+              requests:
+                cpu: 200m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          containers:
+          - name: ingest
+            image: ghcr.io/leopani/agora-backend:latest
+            command: ["agora-ingest-opportunities"]
+            envFrom:
+            - configMapRef:
+                name: agora-config
+            volumeMounts:
+            - name: data
+              mountPath: /data
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 300m
+                memory: 256Mi
+          volumes:
+          - name: data
+            emptyDir: {}

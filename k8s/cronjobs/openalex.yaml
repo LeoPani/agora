@@ -1,0 +1,56 @@
+# Coleta OpenAlex + ingesta toda segunda-feira às 02:00 UTC
+# O padrão init-container garante que o coletor Python termina antes do ingestor Go rodar.
+# Os dois compartilham /data via emptyDir (efêmero, dentro do pod).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: collect-openalex
+  namespace: agora
+spec:
+  schedule: "0 2 * * 1"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          initContainers:
+          - name: collect
+            image: ghcr.io/leopani/agora-workers:latest
+            command: ["python3", "collectors/openalex_collector.py"]
+            envFrom:
+            - configMapRef:
+                name: agora-config
+            volumeMounts:
+            - name: data
+              mountPath: /app/data
+            resources:
+              requests:
+                cpu: 200m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          containers:
+          - name: ingest
+            image: ghcr.io/leopani/agora-backend:latest
+            command: ["agora-ingest-openalex"]
+            envFrom:
+            - configMapRef:
+                name: agora-config
+            volumeMounts:
+            - name: data
+              mountPath: /data
+            resources:
+              requests:
+                cpu: 200m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: data
+            emptyDir: {}

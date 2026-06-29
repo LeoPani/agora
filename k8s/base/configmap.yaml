@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agora-config
+  namespace: agora
+data:
+  DATABASE_URL: "postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable"
+  EMBED_SERVER_URL: "http://embed-server:8082"
+  API_ADDR: ":8081"
+  ENABLE_LLM_LOGGING: "true"
+  LLM_COST_LIMIT_DAILY_USD: "5.00"
+  LLM_PROVIDER_DEFAULT: "groq"
+  LLM_MODEL_DEFAULT: "llama-3.3-70b-versatile"
+  DATA_DIR: "/data"
+  BACKEND_URL: "http://api:8081"

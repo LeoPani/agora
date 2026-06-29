@@ -1,0 +1,69 @@
+# Gera embeddings toda segunda-feira às 04:00 UTC (após coleta OpenAlex às 02:00)
+# Roda 3 workers em paralelo: publications, patents, opportunities
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: generate-embeddings
+  namespace: agora
+spec:
+  schedule: "0 4 * * 1"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      completions: 3
+      parallelism: 3   # os 3 pods rodam ao mesmo tempo
+      completionMode: Indexed
+      template:
+        spec:
+          restartPolicy: OnFailure
+          initContainers:
+          # Garante que o modelo já está no cache antes dos workers subirem
+          - name: warmup-model
+            image: ghcr.io/leopani/agora-workers:latest
+            command: ["python3", "-c",
+              "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"]
+            volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache/huggingface
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: "1"
+                memory: 2Gi
+          containers:
+          - name: worker
+            image: ghcr.io/leopani/agora-workers:latest
+            command: ["sh", "-c",
+              # JOB_COMPLETION_INDEX: 0=publications, 1=patents, 2=opportunities
+              "case $JOB_COMPLETION_INDEX in
+                0) python3 embeddings/generate_embeddings.py --entity publications ;;
+                1) python3 embeddings/generate_embeddings.py --entity patents ;;
+                2) python3 embeddings/generate_embeddings.py --entity opportunities ;;
+              esac"]
+            env:
+            - name: JOB_COMPLETION_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            envFrom:
+            - configMapRef:
+                name: agora-config
+            volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache/huggingface
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: "2"
+                memory: 3Gi
+          volumes:
+          - name: model-cache
+            persistentVolumeClaim:
+              claimName: model-cache-pvc

@@ -50,6 +50,12 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// DataDir retorna o diretório de dados do ai-service.
+// Lê DATA_DIR do ambiente para permitir override em containers.
+func DataDir() string {
+	return getEnv("DATA_DIR", "../ai-service/data")
+}
+
 func getEnv(key, fallback string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
 		return v

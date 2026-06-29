@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: agora
+spec:
+  replicas: 1   # scheduler é singleton — nunca escalar para mais de 1
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+    spec:
+      containers:
+      - name: scheduler
+        image: ghcr.io/leopani/agora-backend:latest
+        command: ["agora-scheduler"]
+        envFrom:
+        - configMapRef:
+            name: agora-config
+        - secretRef:
+            name: agora-secrets
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

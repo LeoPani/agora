@@ -13,7 +13,14 @@ import (
 	"github.com/pgvector/pgvector-go"
 )
 
-const dbURL = "postgresql://agora:agora_dev@localhost:5433/agora?sslmode=disable"
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+var dbURL = envOr("DATABASE_URL", "postgresql://agora:agora_dev@localhost:5433/agora?sslmode=disable")
 
 type EmbRow struct {
 	ID        int64     `json:"id"`
@@ -70,7 +77,7 @@ func main() {
 	}
 	defer db.Close()
 
-	dataDir := "../ai-service/data"
+	dataDir := envOr("DATA_DIR", "../ai-service/data")
 
 	files := map[string]string{
 		dataDir + "/embeddings_publications.jsonl": "publications",

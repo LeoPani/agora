@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache-pvc
+  namespace: agora
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi   # modelo MiniLM ~500 MB; margem para outros modelos
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embed-server
+  namespace: agora
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: embed-server
+  template:
+    metadata:
+      labels:
+        app: embed-server
+    spec:
+      containers:
+      - name: embed-server
+        image: ghcr.io/leopani/agora-workers:latest
+        command: ["python3", "embed_server.py"]
+        envFrom:
+        - configMapRef:
+            name: agora-config
+        ports:
+        - containerPort: 8082
+        volumeMounts:
+        - name: model-cache
+          mountPath: /root/.cache/huggingface
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 18   # até 3min para baixar modelo no primeiro boot
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: "2"
+            memory: 3Gi
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embed-server
+  namespace: agora
+spec:
+  selector:
+    app: embed-server
+  ports:
+  - port: 8082
+    targetPort: 8082

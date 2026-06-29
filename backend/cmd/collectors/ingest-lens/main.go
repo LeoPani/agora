@@ -22,7 +22,7 @@ import (
 	pg "github.com/LeoPani/agora/backend/internal/repository/postgres"
 )
 
-const dataDir = "../ai-service/data"
+var dataDir = config.DataDir()
 
 type lensPatent struct {
 	LensID            string   `json:"lens_id"`

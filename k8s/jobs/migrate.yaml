@@ -1,0 +1,27 @@
+# Roda antes de subir a stack pela primeira vez ou após cada deploy.
+# kubectl apply -f k8s/jobs/migrate.yaml
+# kubectl wait --for=condition=complete job/migrate -n agora --timeout=120s
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: agora
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: migrate
+        image: ghcr.io/leopani/agora-backend:latest
+        command: ["agora-migrate", "up"]
+        envFrom:
+        - configMapRef:
+            name: agora-config
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

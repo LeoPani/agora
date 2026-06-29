@@ -160,6 +160,37 @@ run-scheduler: ## Sobe scheduler de coleta automática
 
 # ── Build ──────────────────────────────────────────────────────────────────────
 
+# ── Kubernetes ─────────────────────────────────────────────────────────────────
+
+k8s-apply: ## Aplica toda a stack no cluster (namespace → base → serviços)
+	kubectl apply -f k8s/base/namespace.yaml
+	kubectl apply -f k8s/base/configmap.yaml
+	kubectl apply -f k8s/base/secret.yaml
+	kubectl apply -f k8s/postgres.yaml
+	kubectl apply -f k8s/embed-server.yaml
+	kubectl apply -f k8s/jobs/migrate.yaml
+	kubectl wait --for=condition=complete job/migrate -n agora --timeout=120s
+	kubectl apply -f k8s/api.yaml
+	kubectl apply -f k8s/scheduler.yaml
+	kubectl apply -f k8s/cronjobs/
+
+k8s-status: ## Status dos pods no namespace agora
+	kubectl get pods,svc,hpa,cronjobs -n agora
+
+k8s-logs: ## Logs da API em tempo real
+	kubectl logs -n agora -l app=api -f
+
+k8s-push: ## Constrói e publica imagens no GHCR (requer docker login ghcr.io)
+	docker build -t ghcr.io/leopani/agora-backend:latest ./backend
+	docker build -t ghcr.io/leopani/agora-workers:latest ./ai-service
+	docker push ghcr.io/leopani/agora-backend:latest
+	docker push ghcr.io/leopani/agora-workers:latest
+
+k8s-down: ## Remove todos os recursos do namespace agora
+	kubectl delete namespace agora
+
+# ── Docker ─────────────────────────────────────────────────────────────────────
+
 docker-build: ## Constrói todas as imagens Docker (backend + workers)
 	docker compose build
 
