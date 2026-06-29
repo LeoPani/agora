@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, User, Bot, ExternalLink, Plus } from "lucide-react";
+import { Sparkles, Send, User, Bot, ExternalLink, Plus, AlertCircle } from "lucide-react";
 import { RadarLoader } from "@/components/loaders/RadarLoader";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081";
@@ -11,6 +11,20 @@ const SOURCE_LABELS = {
   patent: "Patente",
   opportunity: "Edital",
 };
+
+function renderMarkdown(text) {
+  // Renderização simples: **bold**, _italic_, quebras de linha
+  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_|\n)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**"))
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("_") && part.endsWith("_"))
+      return <em key={i} style={{ color: "var(--text-muted)" }}>{part.slice(1, -1)}</em>;
+    if (part === "\n")
+      return <br key={i} />;
+    return part;
+  });
+}
 
 function MessageBubble({ msg }) {
   const isUser = msg.role === "user";
@@ -32,7 +46,7 @@ function MessageBubble({ msg }) {
             color:      "#fff",
           }}
         >
-          {msg.content}
+          {isUser ? msg.content : renderMarkdown(msg.content)}
         </div>
 
         {/* Sources */}
@@ -127,6 +141,7 @@ export default function OraculoPage() {
   const [messages, setMessages]           = useState([]);
   const [input, setInput]                 = useState("");
   const [loading, setLoading]             = useState(false);
+  const [llmMode, setLlmMode]             = useState(null); // null | true | false
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -176,12 +191,12 @@ export default function OraculoPage() {
 
       if (!activeConvId && data.conversation_id) {
         setActiveConvId(data.conversation_id);
-        // Refresh conversation list
         fetch(`${API}/api/conversations`)
           .then((r) => r.json())
           .catch(() => [])
           .then(setConversations);
       }
+      if (data.llm_available !== undefined) setLlmMode(data.llm_available);
 
       setMessages((prev) => [
         ...prev,
@@ -235,6 +250,19 @@ export default function OraculoPage() {
             AI
           </div>
         </div>
+
+        {/* Banner modo sem LLM */}
+        {llmMode === false && (
+          <div
+            className="flex items-center gap-2 px-4 py-2 text-xs"
+            style={{ background: "rgba(212,160,23,0.08)", borderBottom: "1px solid rgba(212,160,23,0.2)", color: "var(--gold)" }}
+          >
+            <AlertCircle size={13} />
+            <span>
+              Modo busca — sem síntese LLM. Configure <code className="mx-1 px-1 rounded" style={{ background: "rgba(212,160,23,0.15)" }}>GROQ_API_KEY</code> em <code style={{ background: "rgba(212,160,23,0.15)" }} className="mx-1 px-1 rounded">backend/.env</code> para ativar o Oráculo completo.
+            </span>
+          </div>
+        )}
 
         {/* Mensagens */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">

@@ -92,26 +92,7 @@ func chatHandler(db *sql.DB, retriever *rag.Retriever, router *llm.Router, logge
 				req.Message + "\n\nRESPOSTA:"
 		}
 
-		// Call LLM
-		completionReq := llm.CompletionRequest{
-			Purpose:     "rag_query",
-			Prompt:      prompt,
-			Temperature: 0.3,
-			MaxTokens:   1024,
-		}
-		resp, llmErr := router.Complete(ctx, completionReq)
-
-		var llmCallID int64
-		if logger != nil {
-			llmCallID = logger.Log(ctx, completionReq, resp, llmErr)
-		}
-
-		if llmErr != nil {
-			writeErr(w, http.StatusInternalServerError, "LLM error: "+llmErr.Error())
-			return
-		}
-
-		// Build sources array
+		// Build sources array (before LLM call so fallback can use it)
 		type sourceRef struct {
 			Index      int    `json:"index"`
 			SourceType string `json:"source_type"`
@@ -131,26 +112,67 @@ func chatHandler(db *sql.DB, retriever *rag.Retriever, router *llm.Router, logge
 			sources = []sourceRef{}
 		}
 
+		// Call LLM
+		completionReq := llm.CompletionRequest{
+			Purpose:     "rag_query",
+			Prompt:      prompt,
+			Temperature: 0.3,
+			MaxTokens:   1024,
+		}
+		resp, llmErr := router.Complete(ctx, completionReq)
+
+		var llmCallID int64
+		if logger != nil {
+			llmCallID = logger.Log(ctx, completionReq, resp, llmErr)
+		}
+
+		// Fallback: sem LLM, monta resposta formatada a partir dos chunks
+		var answerText string
+		if llmErr != nil {
+			if len(chunks) == 0 {
+				answerText = "Nenhum resultado encontrado para sua busca. " +
+					"_(Modo sem LLM — configure GROQ_API_KEY para respostas em linguagem natural.)_"
+			} else {
+				var lines []string
+				lines = append(lines, fmt.Sprintf("Encontrei **%d resultado(s)** para \"_%s_\":\n", len(chunks), req.Message))
+				for i, c := range chunks {
+					snippet := c.Content
+					if len(snippet) > 200 {
+						snippet = snippet[:200] + "…"
+					}
+					lines = append(lines, fmt.Sprintf("**[%d] %s** — %s\n%s", i+1, sourceLabel(c.SourceType), c.Title, snippet))
+				}
+				lines = append(lines, "\n_(Modo sem LLM — configure GROQ_API_KEY para síntese em linguagem natural.)_")
+				answerText = strings.Join(lines, "\n\n")
+			}
+		} else {
+			answerText = resp.Text
+		}
+
 		sourcesJSON, _ := json.Marshal(sources)
 
 		// Save assistant message
-		var _ int64 = llmCallID
 		db.ExecContext(ctx, `
 			INSERT INTO conversation_messages
 			  (conversation_id, role, content, sources, llm_call_id)
 			VALUES ($1, 'assistant', $2, $3, $4)`,
-			convID, resp.Text, string(sourcesJSON), nullInt64(llmCallID),
+			convID, answerText, string(sourcesJSON), nullInt64(llmCallID),
 		)
 
 		// Update conversation timestamp
 		db.ExecContext(ctx,
 			`UPDATE conversations SET updated_at=NOW() WHERE id=$1::uuid`, convID)
 
+		costUSD := 0.0
+		if resp != nil {
+			costUSD = resp.CostUSD
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"conversation_id": convID,
-			"message":         resp.Text,
+			"message":         answerText,
 			"sources":         sources,
-			"cost_usd":        resp.CostUSD,
+			"cost_usd":        costUSD,
+			"llm_available":   llmErr == nil,
 		})
 	})
 }
