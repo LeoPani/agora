@@ -12,11 +12,14 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/lib/pq"
 	"github.com/pgvector/pgvector-go"
+
+	"github.com/joho/godotenv"
 
 	"github.com/LeoPani/agora/backend/internal/config"
 	"github.com/LeoPani/agora/backend/internal/llm"
@@ -26,6 +29,12 @@ import (
 )
 
 func main() {
+	// Carrega .env — tenta CWD e depois o diretório do executável
+	if err := godotenv.Load(".env"); err != nil {
+		if exe, err2 := os.Executable(); err2 == nil {
+			godotenv.Load(filepath.Dir(exe) + "/.env")
+		}
+	}
 	if err := run(); err != nil {
 		slog.Error("api: fatal", "err", err)
 		os.Exit(1)
