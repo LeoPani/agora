@@ -150,7 +150,7 @@ ingest-all: ## Roda TODOS os ingestores em sequência
 # ── Dev ────────────────────────────────────────────────────────────────────────
 
 run-api: ## Sobe API Go na porta 8081
-	cd backend && go run ./cmd/api
+	cd backend && export $$(grep -v '^#' .env | grep -v '^\s*$$' | xargs) && go run ./cmd/api
 
 run-frontend: ## Sobe frontend Next.js na porta 3000
 	cd frontend && npm run dev

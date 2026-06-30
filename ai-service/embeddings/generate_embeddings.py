@@ -44,13 +44,15 @@ def load_model():
     return model
 
 
-def embed_publications(conn, model, batch_size: int):
+def embed_publications(conn, model, batch_size: int, limit=None):
     cur = conn.cursor()
-    cur.execute("""
+    limit_clause = f"LIMIT {limit}" if limit else ""
+    cur.execute(f"""
         SELECT id, title, COALESCE(abstract, '') AS abstract
         FROM publications
         WHERE embedding IS NULL
-        ORDER BY id
+        ORDER BY COALESCE(cited_by_count, 0) DESC
+        {limit_clause}
     """)
     rows = cur.fetchall()
     total = len(rows)
@@ -132,6 +134,8 @@ def main():
         default="all",
     )
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Limita o número de registros a processar (ordenados por relevância)")
     args = parser.parse_args()
 
     model = load_model()
@@ -139,7 +143,7 @@ def main():
 
     try:
         if args.entity in ("publications", "all"):
-            embed_publications(conn, model, args.batch_size)
+            embed_publications(conn, model, args.batch_size, limit=args.limit)
         if args.entity in ("patents", "all"):
             embed_patents(conn, model, args.batch_size)
         if args.entity in ("opportunities", "all"):

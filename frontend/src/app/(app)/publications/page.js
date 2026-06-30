@@ -1,171 +1,307 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Search } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { BookOpen, Search, ExternalLink, TrendingUp, Award, Filter, X } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081";
 
+const TYPE_LABELS = {
+  article: "Artigo",
+  "book-chapter": "Capítulo",
+  review: "Revisão",
+  preprint: "Preprint",
+  dissertation: "Dissertação",
+  dataset: "Dataset",
+  editorial: "Editorial",
+  other: "Outro",
+};
+
+const TYPE_COLOR = {
+  article:    { bg: "rgba(96,165,250,0.12)",  text: "#60a5fa" },
+  review:     { bg: "rgba(167,139,250,0.12)", text: "#a78bfa" },
+  preprint:   { bg: "rgba(212,160,23,0.12)",  text: "#D4A017" },
+  dissertation:{ bg:"rgba(52,211,153,0.12)",  text: "#34d399" },
+};
+
+function PubCard({ pub, onClick }) {
+  const typeC = TYPE_COLOR[pub.type] ?? { bg: "rgba(156,163,175,0.1)", text: "#9ca3af" };
+  const year  = pub.publication_year;
+  const cited = pub.cited_by_count ?? 0;
+  const title = (pub.title || "").replace(/<[^>]+>/g, "");
+  const abstract = (pub.abstract || "").replace(/<[^>]+>/g, "").slice(0, 180);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-xl p-5 flex flex-col gap-3 transition-all"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--purple)"; e.currentTarget.style.background = "var(--surface-2)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+          style={{ background: typeC.bg, color: typeC.text }}
+        >
+          {TYPE_LABELS[pub.type] ?? pub.type}
+        </span>
+        <span className="text-xs tabular-nums shrink-0" style={{ color: "var(--text-dim)" }}>{year}</span>
+      </div>
+
+      <h3 className="text-sm font-semibold text-white leading-snug line-clamp-2"
+        style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+        {title}
+      </h3>
+
+      {abstract && (
+        <p className="text-xs leading-relaxed"
+          style={{ color: "var(--text-dim)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {abstract}…
+        </p>
+      )}
+
+      {cited > 0 && (
+        <div className="flex items-center gap-1.5 mt-auto">
+          <TrendingUp size={11} style={{ color: cited > 100 ? "var(--gold)" : "var(--text-dim)" }} />
+          <span className="text-xs tabular-nums" style={{ color: cited > 100 ? "var(--gold)" : "var(--text-dim)" }}>
+            {cited.toLocaleString("pt-BR")} citações
+          </span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+      <p className="text-2xl font-bold" style={{ color: color ?? "var(--text-muted)" }}>
+        {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
+      </p>
+      <p className="text-xs font-medium mt-0.5 text-white">{label}</p>
+      {sub && <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{sub}</p>}
+    </div>
+  );
+}
+
+function Modal({ pub, onClose }) {
+  if (!pub) return null;
+  const title    = (pub.title || "").replace(/<[^>]+>/g, "");
+  const abstract = (pub.abstract || "").replace(/<[^>]+>/g, "");
+  const typeC    = TYPE_COLOR[pub.type] ?? { bg: "rgba(156,163,175,0.1)", text: "#9ca3af" };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.75)" }} onClick={onClose}>
+      <div className="rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: typeC.bg, color: typeC.text }}>
+            {TYPE_LABELS[pub.type] ?? pub.type}
+          </span>
+          <button onClick={onClose} className="shrink-0" style={{ color: "var(--text-dim)" }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <h2 className="text-base font-bold text-white leading-snug mb-3">{title}</h2>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {pub.publication_year && (
+            <span className="text-xs px-2 py-0.5 rounded" style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}>
+              {pub.publication_year}
+            </span>
+          )}
+          {(pub.cited_by_count ?? 0) > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded flex items-center gap-1"
+              style={{ background: "rgba(212,160,23,0.1)", color: "var(--gold)" }}>
+              <Award size={10} /> {pub.cited_by_count.toLocaleString("pt-BR")} citações
+            </span>
+          )}
+        </div>
+
+        {abstract && (
+          <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-muted)" }}>{abstract}</p>
+        )}
+
+        {pub.doi && (
+          <a href={`https://doi.org/${pub.doi.replace("https://doi.org/","")}`}
+            target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs py-2 px-3 rounded-lg"
+            style={{ background: "var(--purple-soft)", color: "var(--purple)", border: "1px solid rgba(139,92,246,0.3)" }}>
+            <ExternalLink size={11} /> Ver publicação ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const YEARS = ["all", ...Array.from({ length: 15 }, (_, i) => String(2024 - i))];
+const TYPES = ["all", "article", "review", "book-chapter", "preprint", "dissertation", "other"];
+
 export default function PublicationsPage() {
-  const [pubs, setPubs]       = useState([]);
-  const [loading, setLoad]    = useState(true);
-  const [q, setQ]             = useState("");
-  const [source, setSource]   = useState("all");
-  const [modal, setModal]     = useState(null);
+  const [pubs, setPubs]     = useState([]);
+  const [loading, setLoad]  = useState(true);
+  const [q, setQ]           = useState("");
+  const [year, setYear]     = useState("all");
+  const [type, setType]     = useState("all");
+  const [modal, setModal]   = useState(null);
+  const [page, setPage]     = useState(0);
+  const PER_PAGE = 30;
 
   useEffect(() => {
-    fetch(`${API}/api/v1/publications?limit=200`)
+    fetch(`${API}/api/v1/publications?limit=500`)
       .then((r) => r.json())
       .catch(() => [])
-      .then((d) => { setPubs(Array.isArray(d) ? d : d?.publications ?? []); setLoad(false); });
+      .then((d) => { setPubs(Array.isArray(d) ? d : []); setLoad(false); });
   }, []);
 
-  const sources = ["all", ...new Set(pubs.map((p) => p.source || "OpenAlex"))];
+  // Stats
+  const stats = useMemo(() => {
+    const totalCitations = pubs.reduce((s, p) => s + (p.cited_by_count ?? 0), 0);
+    const topCited = [...pubs].sort((a, b) => (b.cited_by_count ?? 0) - (a.cited_by_count ?? 0)).slice(0, 3);
+    const byYear = pubs.reduce((a, p) => { const y = p.publication_year; if (y) a[y] = (a[y]||0)+1; return a; }, {});
+    const peakYear = Object.entries(byYear).sort((a,b)=>b[1]-a[1])[0];
+    return { totalCitations, topCited, peakYear };
+  }, [pubs]);
 
-  const filtered = pubs.filter((p) => {
-    const matchQ = !q || (p.title || "").toLowerCase().includes(q.toLowerCase());
-    const matchS = source === "all" || (p.source || "OpenAlex") === source;
-    return matchQ && matchS;
-  });
+  const filtered = useMemo(() => {
+    return pubs.filter((p) => {
+      const title = ((p.title || "") + " " + (p.abstract || "")).toLowerCase();
+      if (q && !title.includes(q.toLowerCase())) return false;
+      if (year !== "all" && String(p.publication_year) !== year) return false;
+      if (type !== "all") {
+        const t = p.type || "other";
+        if (type === "other") return !["article","review","book-chapter","preprint","dissertation"].includes(t);
+        if (t !== type) return false;
+      }
+      return true;
+    });
+  }, [pubs, q, year, type]);
 
-  const bySource = pubs.reduce((acc, p) => {
-    const s = p.source || "OpenAlex";
-    acc[s] = (acc[s] || 0) + 1;
-    return acc;
-  }, {});
+  const hasFilters = q || year !== "all" || type !== "all";
+  const pageSlice  = filtered.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+
+  function resetFilters() { setQ(""); setYear("all"); setType("all"); setPage(0); }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Publicações</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-          Produção científica UFV indexada
-        </p>
-      </div>
-
-      {/* KPIs por fonte */}
-      <div className="flex gap-4 flex-wrap">
-        {Object.entries(bySource).map(([s, n]) => (
-          <div key={s} className="rounded-xl px-5 py-3 flex gap-3 items-center"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <BookOpen size={14} style={{ color: "var(--accent-hover)" }} />
-            <span className="text-sm font-medium text-white">{s}</span>
-            <span className="text-xl font-bold text-white">{n.toLocaleString("pt-BR")}</span>
-          </div>
-        ))}
-        <div className="rounded-xl px-5 py-3 flex gap-3 items-center"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <span className="text-sm" style={{ color: "var(--text-muted)" }}>Total</span>
-          <span className="text-xl font-bold text-white">{pubs.length.toLocaleString("pt-BR")}</span>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+            <BookOpen size={20} style={{ color: "var(--purple)" }} />
+            Portfólio de Publicações UFV
+          </h1>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+            Produção científica indexada pela OpenAlex
+          </p>
         </div>
       </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Publicações" value={pubs.length} color="var(--purple)" />
+        <StatCard label="Citações totais" value={stats.totalCitations} color="var(--gold)" />
+        <StatCard label="Artigos" value={pubs.filter(p=>p.type==="article").length} color="#60a5fa" />
+        <StatCard label="Ano mais produtivo" value={stats.peakYear?.[0] ?? "—"}
+          sub={stats.peakYear ? `${stats.peakYear[1]} publicações` : ""} color="#34d399" />
+      </div>
+
+      {/* Top citados */}
+      {stats.topCited.length > 0 && (
+        <div className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid rgba(212,160,23,0.25)" }}>
+          <p className="text-xs font-semibold mb-3 flex items-center gap-1.5" style={{ color: "var(--gold)" }}>
+            <Award size={12} /> Mais citados
+          </p>
+          <div className="space-y-2">
+            {stats.topCited.map((p, i) => (
+              <button key={p.id} onClick={() => setModal(p)}
+                className="w-full text-left flex items-start gap-3 text-xs"
+                style={{ color: "var(--text-muted)" }}>
+                <span className="font-bold tabular-nums shrink-0" style={{ color: "var(--gold)" }}>#{i+1}</span>
+                <span className="flex-1 text-white line-clamp-1 truncate">{(p.title||"").replace(/<[^>]+>/g,"")}</span>
+                <span className="shrink-0 tabular-nums">{(p.cited_by_count??0).toLocaleString("pt-BR")} cit.</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filtros */}
-      <div className="flex gap-3 flex-wrap items-center">
+      <div className="flex gap-2 flex-wrap items-center">
         <div className="relative flex-1 min-w-48">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-dim)" }} />
           <input
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg"
+            className="w-full pl-8 pr-4 py-2 text-sm rounded-lg"
             style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
-            placeholder="Buscar por título…"
+            placeholder="Buscar por título ou palavra-chave…"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => { setQ(e.target.value); setPage(0); }}
           />
         </div>
-        <select
+        <select value={year} onChange={(e) => { setYear(e.target.value); setPage(0); }}
           className="px-3 py-2 text-sm rounded-lg"
-          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-        >
-          {sources.map((s) => <option key={s} value={s}>{s === "all" ? "Todas as fontes" : s}</option>)}
+          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
+          {YEARS.map((y) => <option key={y} value={y}>{y === "all" ? "Todos os anos" : y}</option>)}
         </select>
+        <select value={type} onChange={(e) => { setType(e.target.value); setPage(0); }}
+          className="px-3 py-2 text-sm rounded-lg"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}>
+          {TYPES.map((t) => <option key={t} value={t}>{t === "all" ? "Todos os tipos" : (TYPE_LABELS[t] ?? t)}</option>)}
+        </select>
+        {hasFilters && (
+          <button onClick={resetFilters} className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-dim)" }}>
+            <X size={12} /> Limpar
+          </button>
+        )}
+        <span className="text-xs ml-auto" style={{ color: "var(--text-dim)" }}>
+          {filtered.length.toLocaleString("pt-BR")} resultado{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* Tabela */}
-      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ background: "var(--surface)" }}>
-              {["Título", "Ano", "Tipo", "Citações", "Fonte"].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={5} className="text-center py-8" style={{ color: "var(--text-muted)" }}>Carregando…</td></tr>
-            )}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-8" style={{ color: "var(--text-muted)" }}>Nenhuma publicação encontrada.</td></tr>
-            )}
-            {filtered.slice(0, 100).map((p, i) => (
-              <tr
-                key={p.id || p.openalex_id || i}
-                className="cursor-pointer transition-colors"
-                style={{ borderBottom: "1px solid var(--border)" }}
-                onClick={() => setModal(p)}
-                onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-              >
-                <td className="px-4 py-3 text-white max-w-md truncate">{p.title || "—"}</td>
-                <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-muted)" }}>{p.publication_year || "—"}</td>
-                <td className="px-4 py-3"><Badge variant="muted">{p.type || "article"}</Badge></td>
-                <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-muted)" }}>{p.cited_by_count ?? 0}</td>
-                <td className="px-4 py-3"><Badge variant="default">{p.source || "OpenAlex"}</Badge></td>
-              </tr>
+      {/* Grid de cards */}
+      {loading ? (
+        <div className="py-16 text-center" style={{ color: "var(--text-muted)" }}>Carregando portfólio…</div>
+      ) : filtered.length === 0 ? (
+        <div className="py-16 text-center" style={{ color: "var(--text-muted)" }}>Nenhuma publicação encontrada.</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pageSlice.map((p) => (
+              <PubCard key={p.id ?? p.openalex_id} pub={p} onClick={() => setModal(p)} />
             ))}
-          </tbody>
-        </table>
-      </div>
-      {filtered.length > 100 && (
-        <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
-          Mostrando 100 de {filtered.length.toLocaleString("pt-BR")} resultados. Use a busca para refinar.
-        </p>
+          </div>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button disabled={page === 0}
+                onClick={() => setPage(p => p - 1)}
+                className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-40"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                ← Anterior
+              </button>
+              <span className="text-xs" style={{ color: "var(--text-dim)" }}>
+                {page + 1} / {totalPages}
+              </span>
+              <button disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => p + 1)}
+                className="px-3 py-1.5 text-xs rounded-lg disabled:opacity-40"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                Próxima →
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Modal */}
-      {modal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.7)" }}
-          onClick={() => setModal(null)}
-        >
-          <div
-            className="rounded-xl p-6 max-w-xl w-full max-h-[80vh] overflow-y-auto"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold text-white mb-3">{modal.title}</h2>
-            <div className="flex gap-2 flex-wrap mb-4">
-              <Badge variant="muted">{modal.type || "article"}</Badge>
-              <Badge variant="muted">{modal.publication_year}</Badge>
-              <Badge variant={modal.cited_by_count > 50 ? "gold" : "default"}>
-                {modal.cited_by_count ?? 0} citações
-              </Badge>
-            </div>
-            {modal.abstract && (
-              <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-muted)" }}>
-                {modal.abstract}
-              </p>
-            )}
-            {modal.doi && (
-              <a href={`https://doi.org/${modal.doi}`} target="_blank" rel="noreferrer"
-                className="text-xs" style={{ color: "var(--accent-hover)" }}>
-                DOI: {modal.doi} ↗
-              </a>
-            )}
-            <button
-              className="mt-4 text-xs px-4 py-2 rounded-lg block"
-              style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}
-              onClick={() => setModal(null)}
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
+      <Modal pub={modal} onClose={() => setModal(null)} />
     </div>
   );
 }

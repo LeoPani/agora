@@ -17,9 +17,11 @@ Responda às perguntas usando APENAS as fontes fornecidas no contexto abaixo.
 
 REGRAS OBRIGATÓRIAS:
 - Cite as fontes com [1], [2], etc.
+- Quando houver grupos de pesquisa no contexto, mencione o grupo e suas linhas de pesquisa mesmo que não haja nomes individuais de pesquisadores.
+- Quando publicações têm autores listados, use esses nomes para responder "quem pesquisa X".
 - Se a resposta não estiver no contexto, diga "Não encontrei essa informação nos dados disponíveis."
 - Seja conciso. Responda em português brasileiro.
-- Quando listar pesquisadores ou patentes, use formato de lista.`
+- Quando listar pesquisadores ou grupos, use formato de lista com marcadores.`
 
 // POST /api/chat
 func chatHandler(db *sql.DB, retriever *rag.Retriever, router *llm.Router, logger *llm.DBLogger) http.HandlerFunc {
@@ -258,6 +260,8 @@ func sourceLabel(t string) string {
 		return "Patente"
 	case "opportunity":
 		return "Edital"
+	case "research_group":
+		return "Grupo de Pesquisa UFV"
 	}
 	return t
 }

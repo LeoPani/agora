@@ -8,6 +8,8 @@
 *.out
 vendor/
 dist/
+backend/api
+backend/logs/
 
 # Environment
 .env

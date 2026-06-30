@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Sparkles, Send, User, Bot, ExternalLink, Plus, AlertCircle } from "lucide-react";
 import { RadarLoader } from "@/components/loaders/RadarLoader";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081";
 
 const SOURCE_LABELS = {
-  publication: "Publicação",
-  patent: "Patente",
-  opportunity: "Edital",
+  publication:    "Publicação",
+  patent:         "Patente",
+  opportunity:    "Edital",
+  research_group: "Grupo de Pesquisa",
 };
 
 function renderMarkdown(text) {
@@ -135,14 +137,18 @@ function ConvList({ conversations, activeId, onSelect, onNew }) {
   );
 }
 
-export default function OraculoPage() {
+import { Suspense } from "react";
+
+function OraculoInner() {
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId]   = useState(null);
   const [messages, setMessages]           = useState([]);
   const [input, setInput]                 = useState("");
   const [loading, setLoading]             = useState(false);
   const [llmMode, setLlmMode]             = useState(null); // null | true | false
-  const bottomRef = useRef(null);
+  const bottomRef  = useRef(null);
+  const sentRef    = useRef(false); // evita duplo envio de query via URL
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     fetch(`${API}/api/conversations`)
@@ -150,6 +156,16 @@ export default function OraculoPage() {
       .catch(() => [])
       .then(setConversations);
   }, []);
+
+  // Dispara query automática quando vem de outro page (?q=...)
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && !sentRef.current) {
+      sentRef.current = true;
+      doSend(q);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -172,15 +188,12 @@ export default function OraculoPage() {
     setMessages([]);
   }
 
-  async function sendMessage(e) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const userMsg = input.trim();
+  async function doSend(text) {
+    if (!text?.trim() || loading) return;
+    const userMsg = text.trim();
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg, sources: [] }]);
     setLoading(true);
-
     try {
       const resp = await fetch(`${API}/api/chat`, {
         method:  "POST",
@@ -188,28 +201,30 @@ export default function OraculoPage() {
         body:    JSON.stringify({ conversation_id: activeConvId, message: userMsg }),
       });
       const data = await resp.json();
-
       if (!activeConvId && data.conversation_id) {
         setActiveConvId(data.conversation_id);
-        fetch(`${API}/api/conversations`)
-          .then((r) => r.json())
-          .catch(() => [])
-          .then(setConversations);
+        fetch(`${API}/api/conversations`).then((r) => r.json()).catch(() => []).then(setConversations);
       }
       if (data.llm_available !== undefined) setLlmMode(data.llm_available);
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.message ?? data.error ?? "Erro na resposta", sources: data.sources ?? [] },
-      ]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Erro ao contactar o servidor. Verifique se a API está rodando.", sources: [] },
-      ]);
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: data.message ?? data.error ?? "Erro na resposta",
+        sources: data.sources ?? [],
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: "Erro ao contactar o servidor. Verifique se a API está rodando.",
+        sources: [],
+      }]);
     } finally {
       setLoading(false);
     }
+  }
+
+  function sendMessage(e) {
+    e.preventDefault();
+    doSend(input);
   }
 
   const suggestions = [
@@ -370,5 +385,13 @@ export default function OraculoPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function OraculoPage() {
+  return (
+    <Suspense>
+      <OraculoInner />
+    </Suspense>
   );
 }
