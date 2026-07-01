@@ -217,7 +217,9 @@ pipeline: ## Pipeline completo: coleta → ingest → embeddings → valida RAG
 	$(MAKE) ingest-comex ingest-trends ingest-opportunities
 	@echo "==> [4/5] Gerando embeddings de publicações sem vetor..."
 	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --batch-size 64
-	@echo "==> [5/5] Validando RAG..."
+	@echo "==> [5/5] Gerando sinais acionáveis..."
+	$(MAKE) generate-signals
+	@echo "==> [6/6] Validando RAG..."
 	$(MAKE) test-rag
 	@echo ""
 	@echo "Pipeline concluído. Banco de dados atualizado."
@@ -235,6 +237,9 @@ pipeline-full: ## Pipeline completo incluindo coleta OpenAlex (demorado — ~20m
 	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --batch-size 64
 	@echo "==> [6/6] Validando RAG..."
 	$(MAKE) test-rag
+
+generate-signals: ## Gera sinais acionáveis cruzando todos os dados do banco
+	cd ai-service && ./venv/bin/python3 signal_engine.py
 
 test-rag: ## Valida o RAG com uma query de teste via API
 	@echo "Testando RAG..."

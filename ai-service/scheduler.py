@@ -114,6 +114,24 @@ def job(name: str, script: str, ingest_source: str | None = None):
 
 # ── Agendamentos ─────────────────────────────────────────────────────────────
 
+def run_signal_engine():
+    """Executa o signal_engine.py diretamente."""
+    engine = Path(__file__).parent / "signal_engine.py"
+    log.info("running signal engine")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(engine)],
+            capture_output=True, text=True, timeout=300,
+            env={**os.environ},
+        )
+        if result.returncode == 0:
+            log.info("signal engine OK")
+        else:
+            log.error("signal engine FAILED: %s", result.stderr[-500:])
+    except Exception as e:
+        log.error("signal engine exception: %s", e)
+
+
 def setup_schedule():
     # OpenAlex — mensal
     schedule.every(30).days.do(job, "openalex", "openalex_collector.py", "openalex")
@@ -137,6 +155,9 @@ def setup_schedule():
     # Google Trends — quinzenal
     schedule.every(15).days.do(job, "trends", "trends_collector.py", "trends")
 
+    # Signal Engine — diário (cruza dados e gera sinais)
+    schedule.every(1).days.do(run_signal_engine)
+
 
 def run_all_now():
     """Executa todos os jobs imediatamente na primeira inicialização."""
@@ -156,6 +177,7 @@ def main():
     job("comex",   "comex_collector.py",   "comex")
     job("trends",  "trends_collector.py",  "trends")
     job("dgp",     "dgp_collector.py",     "dgp")
+    run_signal_engine()
 
     log.info("entering scheduler loop")
     while True:
