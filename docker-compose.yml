@@ -62,15 +62,36 @@ services:
     networks:
       - agora
 
-  # ── Scheduler de coleta automática ───────────────────────────────────────────
+  # ── Scheduler Go — dispara ingest jobs com binários compilados ───────────────
   scheduler:
     image: agora-backend
     command: ["agora-scheduler"]
     environment:
       DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+      INGEST_BIN_DIR: "/usr/local/bin"
+      # PYTHON_BIN vazio → jobs Python delegados ao py-scheduler abaixo
     depends_on:
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - agora
+
+  # ── Scheduler Python — roda collectors + dispara ingest via API ──────────────
+  py-scheduler:
+    image: agora-workers
+    command: ["python3", "scheduler.py"]
+    environment:
+      DATABASE_URL: postgres://agora:agora_dev@postgres:5432/agora?sslmode=disable
+      BACKEND_URL: "http://api:8081"
+      DATA_DIR: "/app/data"
+    volumes:
+      - ./ai-service/data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
     restart: unless-stopped
     networks:
       - agora

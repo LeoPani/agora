@@ -622,6 +622,7 @@ func run() error {
 	retriever := rag.New(db, embedURL)
 
 	mux.HandleFunc("POST /internal/llm/complete",          llmCompleteHandler(llmRouter, llmLogger))
+	mux.HandleFunc("POST /internal/ingest/{source}",       ingestTriggerHandler())
 	mux.HandleFunc("GET /api/v1/llm-stats",                llmStatsHandler(db))
 	mux.HandleFunc("POST /api/chat",                       chatHandler(db, retriever, llmRouter, llmLogger))
 	mux.HandleFunc("GET /api/conversations",               conversationsHandler(db))

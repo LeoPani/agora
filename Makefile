@@ -10,7 +10,7 @@
         collect-trends ingest-trends \
         collect-partners collect-linkedin ingest-partners \
         embed embed-publications embed-patents embed-server ingest-embeddings \
-        collect-all ingest-all \
+        collect-all ingest-all pipeline \
         run-api run-frontend run-scheduler build clean
 
 INPUT ?= $(HOME)/Downloads/lens_export.csv
@@ -205,6 +205,46 @@ docker-logs: ## Acompanha logs de todos os serviços
 
 docker-collect: ## Roda coletor Python via Docker (ex: make docker-collect CMD="collectors/openalex_collector.py")
 	docker compose run --rm workers python3 $(CMD)
+
+# ── Pipeline completo (desenvolvimento local) ──────────────────────────────────
+
+pipeline: ## Pipeline completo: coleta → ingest → embeddings → valida RAG
+	@echo "==> [1/5] Coletando Comex Stat..."
+	$(MAKE) collect-comex
+	@echo "==> [2/5] Coletando Google Trends..."
+	$(MAKE) collect-trends
+	@echo "==> [3/5] Ingerindo dados no Postgres..."
+	$(MAKE) ingest-comex ingest-trends ingest-opportunities
+	@echo "==> [4/5] Gerando embeddings de publicações sem vetor..."
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --batch-size 64
+	@echo "==> [5/5] Validando RAG..."
+	$(MAKE) test-rag
+	@echo ""
+	@echo "Pipeline concluído. Banco de dados atualizado."
+
+pipeline-full: ## Pipeline completo incluindo coleta OpenAlex (demorado — ~20min)
+	@echo "==> [1/6] Coletando OpenAlex..."
+	$(MAKE) collect-openalex
+	@echo "==> [2/6] Ingerindo OpenAlex..."
+	$(MAKE) ingest-openalex
+	@echo "==> [3/6] Coletando dados de mercado..."
+	$(MAKE) collect-comex collect-trends
+	@echo "==> [4/6] Ingerindo dados de mercado..."
+	$(MAKE) ingest-comex ingest-trends ingest-opportunities
+	@echo "==> [5/6] Gerando embeddings..."
+	cd ai-service && ./venv/bin/python3 embeddings/generate_embeddings.py --batch-size 64
+	@echo "==> [6/6] Validando RAG..."
+	$(MAKE) test-rag
+
+test-rag: ## Valida o RAG com uma query de teste via API
+	@echo "Testando RAG..."
+	@curl -sf -X POST http://localhost:8081/api/chat \
+		-H "Content-Type: application/json" \
+		-d '{"message":"Quem pesquisa biocontrole de pragas na UFV?"}' \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); \
+		  print('  LLM:', d.get('llm_available')); \
+		  print('  Fontes:', len(d.get('sources',[])));  \
+		  print('  Resposta:', d.get('message','')[:120])"
 
 docker-embed: ## Gera embeddings via Docker
 	docker compose run --rm workers python3 embeddings/generate_embeddings.py
