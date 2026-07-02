@@ -12,9 +12,7 @@ EXISTENTE:
 - Targets do Makefile configurados
 
 FALTANDO:
-- Página /signals no frontend (Etapa 5)
-- Atualização do Dashboard com novos KPIs e LineChart (Etapa 5)
-- Atualização do README.md (Etapa 8)
+- Tudo foi concluído. (Etapa 5 e 8 implementadas).
 
 DADOS NO BANCO:
 - Banco de dados requer que Docker esteja executando para verificar contagens (Docker daemon não iniciado).
