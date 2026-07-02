@@ -101,15 +101,28 @@ func run() error {
 	// ── /api/v1/stats ──────────────────────────────────────────────────────────
 	mux.HandleFunc("GET /api/v1/stats", cors(func(w http.ResponseWriter, r *http.Request) {
 		var cResearchers, cPublications, cPatents, cGroups int64
-		var cOpps, cGaps, cTrends, cRuns int64
+		var cOpps, cGaps, cTrends, cRuns, cSignals int64
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM researchers").Scan(&cResearchers)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM publications").Scan(&cPublications)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM patents").Scan(&cPatents)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM research_groups").Scan(&cGroups)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM opportunities").Scan(&cOpps)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM import_gaps").Scan(&cGaps)
+	db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM signals WHERE status='new'").Scan(&cSignals)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM market_trends").Scan(&cTrends)
 		db.QueryRowContext(r.Context(), "SELECT COUNT(*) FROM collector_runs").Scan(&cRuns)
+
+		
+		var pubByYear []map[string]interface{}
+		rowsPubs, err := db.QueryContext(r.Context(), "SELECT publication_year, COUNT(*) FROM publications WHERE publication_year IS NOT NULL AND publication_year >= 2010 GROUP BY publication_year ORDER BY publication_year")
+		if err == nil {
+			defer rowsPubs.Close()
+			for rowsPubs.Next() {
+				var year, count int
+				rowsPubs.Scan(&year, &count)
+				pubByYear = append(pubByYear, map[string]interface{}{"year": year, "count": count})
+			}
+		}
 
 		var lastCollected *string
 		var nextCollection string
@@ -129,8 +142,10 @@ func run() error {
 			"research_groups": cGroups,
 			"opportunities":   cOpps,
 			"import_gaps":     cGaps,
+			"active_signals":  cSignals,
 			"market_trends":   cTrends,
 			"collector_runs":  cRuns,
+			"publications_by_year": pubByYear,
 			"last_collected":  lastCollected,
 			"next_collection": nextCollection,
 		})

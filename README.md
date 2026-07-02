@@ -1,14 +1,48 @@
 # Ágora by Argos
 
+![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white)
+![Next JS](https://img.shields.io/badge/Next-black?style=for-the-badge&logo=next.js&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![pgvector](https://img.shields.io/badge/pgvector-purple?style=for-the-badge)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
+[![Dataset](https://img.shields.io/badge/Dataset-INPI_775K-blue?style=for-the-badge&logo=huggingface)](https://huggingface.co/datasets/LeoPani/inpi-patent-abstracts)
+
 **Radar de Inteligência de Inovação para NITs Brasileiros**
 
-Ágora é um sistema que escaneia automaticamente o ecossistema de
-inovação universitário e gera sinais acionáveis para Núcleos de
-Inovação Tecnológica. Onde o Argos gerencia a propriedade intelectual
-existente, o Ágora identifica o que pode virar PI, quem deve colaborar
-com quem, e onde estão as oportunidades de transferência de tecnologia.
+![Dashboard](docs/screenshot-dashboard.png)
+
+Ágora é um sistema que escaneia automaticamente o ecossistema de inovação universitário e gera sinais acionáveis para Núcleos de Inovação Tecnológica. Onde o Argos gerencia a propriedade intelectual existente, o Ágora identifica o que pode virar PI, quem deve colaborar com quem, e onde estão as oportunidades de transferência de tecnologia.
 
 Projeto piloto com o NIT.UFV (Universidade Federal de Viçosa).
+
+---
+
+## Quick Start
+
+Para rodar o projeto localmente com as configurações padronizadas de testes:
+
+```bash
+# 1. Instalar dependências (Go, Node, Python venv)
+make setup
+
+# 2. Subir banco de dados e aplicar migrations
+make db-up
+make migrate
+
+# 3. Coletar e Ingerir dados (ex: OpenAlex)
+make collect-openalex
+make ingest-openalex
+
+# 4. Iniciar servidor de Embeddings (em outro terminal)
+make run-embed-server
+
+# 5. Gerar vetores semânticos no banco
+make generate-embeddings
+
+# 6. Rodar os serviços da aplicação
+make run-api       # Terminal 3
+make run-frontend  # Terminal 4
+```
 
 ---
 
@@ -16,25 +50,57 @@ Projeto piloto com o NIT.UFV (Universidade Federal de Viçosa).
 
 O Ágora atua antes da PI formal. Ele responde três perguntas:
 
-1. **O que a universidade tem?** Publicações, teses, projetos,
-   competências dos pesquisadores, PI existente.
-2. **O que o mundo precisa?** Editais, empresas buscando tecnologia,
-   tendências de mercado, gaps de importação, setores em crescimento.
-3. **Quem conectar com quem?** Cruzamento com IA para sugerir
-   parcerias, licenciamentos, depósitos de PI, pools de patentes.
+1. **O que a universidade tem?** Publicações, teses, projetos, competências dos pesquisadores, PI existente.
+2. **O que o mundo precisa?** Editais, empresas buscando tecnologia, tendências de mercado, gaps de importação, setores em crescimento.
+3. **Quem conectar com quem?** Cruzamento com IA para sugerir parcerias, licenciamentos, depósitos de PI, pools de patentes.
 
 A PI é uma saída possível, não o ponto de partida.
 
 ## Por que existe
 
-O Sistema Financiar (FUNARBE/UFV) foi descontinuado em agosto de 2024
-após 21 anos de operação. Era a principal ferramenta de prospecção de
-editais para NITs brasileiros. Existe um vácuo que precisa ser preenchido,
-e a tecnologia disponível hoje (IA, embeddings semânticos, scraping
-robusto, dados abertos) permite algo muito mais sofisticado do que o
-Financiar entregava.
+O Sistema Financiar (FUNARBE/UFV) foi descontinuado em agosto de 2024 após 21 anos de operação. Era a principal ferramenta de prospecção de editais para NITs brasileiros. Existe um vácuo que precisa ser preenchido, e a tecnologia disponível hoje (IA, embeddings semânticos, scraping robusto, dados abertos) permite algo muito mais sofisticado do que o Financiar entregava.
 
-## Arquitetura de Dados — Quatro Camadas
+---
+
+## Architecture
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                        FRONTEND (Next.js)                    │
+│   Dashboard | /signals | /opportunities | /oraculo | /agente │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ HTTP / REST
+┌──────────────────────────────▼───────────────────────────────┐
+│                          BACKEND (Go)                        │
+│                                                              │
+│  ┌────────────────┐     ┌──────────────┐     ┌────────────┐  │
+│  │ API Endpoints  │◄───►│ RAG Retriever│◄───►│ ReAct Agent│  │
+│  └────────────────┘     └───────┬──────┘     └──────┬─────┘  │
+│          ▲                      │                   │        │
+│          │                      ▼                   ▼        │
+│  ┌───────▼────────┐     ┌──────────────┐     ┌────────────┐  │
+│  │ Internal LLM   │◄───►│   AI Router  │◄───►│  Providers │  │
+│  │ Module (cost)  │     │(Groq,Gemini..)     │            │  │
+│  └────────────────┘     └──────────────┘     └────────────┘  │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+            ┌──────────────────┼────────────────────┐
+            │                  │                    │
+┌───────────▼────────┐ ┌───────▼────────┐ ┌─────────▼──────────┐
+│   PostgreSQL DB    │ │ PYTHON WORKERS │ │ EMBEDDING SERVER   │
+│   (com pgvector)   │ │ (ai-service)   │ │ port: 8082         │
+└───────────┬────────┘ └───────┬────────┘ └─────────┬──────────┘
+            │                  │                    │
+            └──────────────────┴────────────────────┘
+                               │
+   ┌───────────────────┬───────┴───────┬───────────────────┐
+   ▼                   ▼               ▼                   ▼
+Camada 1:          Camada 2:       Camada 3:           Camada 4:
+PESQUISA           PI              MERCADO             PARCEIROS
+- OpenAlex         - INPI 775K     - Editais (4x)      - Empresas
+- Locus DSpace     - Google Pat.   - Comex Stat        - Citações
+- Grupos CNPq      - Lens.org      - Google Trends     - Lattes
+```
 
 ### Camada 1: Pesquisa (oferta da universidade)
 | Fonte | Dado | Volume estimado |
