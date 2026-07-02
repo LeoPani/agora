@@ -9,6 +9,7 @@
 vendor/
 dist/
 backend/api
+backend/scheduler
 backend/logs/
 
 # Environment
